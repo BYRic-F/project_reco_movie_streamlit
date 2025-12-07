@@ -1,0 +1,209 @@
+/* ===== BACKGROUND CINÉMA ===== */
+.stApp {
+    background: radial-gradient(circle at top, #1a1a2e 0%, #0b0b0f 65%);
+}
+
+/* ===== TITRES GLOW BLOCKBUSTER ===== */
+h1, h2, h3 {
+    text-shadow: 0px 0px 15px rgba(225, 6, 0, 0.8);
+    letter-spacing: 2px;
+    font-weight: 800;
+}
+
+/* ===== BOUTONS CINÉMA ===== */
+.stButton > button {
+    background: linear-gradient(135deg, #E10600, #7a0000);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0px 0px 15px rgba(225, 6, 0, 0.6);
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.stButton > button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 0px 25px rgba(225, 6, 0, 1);
+}
+
+/* ===== SIDEBAR CINÉMA ===== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0B0B0F 0%, #1A1A1D 100%);
+    border-right: 2px solid #E10600;
+}
+
+/* ===== CARTES STYLE IMAX ===== */
+div[data-testid="stMetric"], 
+div[data-testid="stDataFrame"], 
+div[data-testid="stPlotlyChart"] {
+    background-color: #16161D;
+    border-radius: 18px;
+    padding: 15px;
+    box-shadow: 0px 0px 20px rgba(0,0,0,0.8);
+}
+
+/* ===== ANIMATION PROJECTEUR ===== */
+@keyframes flicker {
+    0% {opacity: 1;}
+    50% {opacity: 0.95;}
+    100% {opacity: 1;}
+}
+
+.stApp {
+    animation: flicker 4s infinite;
+}
+
+/* ===== TEXTE CINÉMA ===== */
+p, label, span {
+    font-size: 16px;
+    letter-spacing: 0.5px;
+}
+
+/* ===== SELECTBOX CINÉMA ===== */
+div[data-testid="stSelectbox"] > div {
+    background: linear-gradient(135deg, #1a1a2e, #0b0b0f);
+    border-radius: 12px;
+    border: 1px solid #E10600;
+    box-shadow: 0px 0px 12px rgba(225, 6, 0, 0.6);
+    color: white;
+}
+
+/* Texte du select */
+div[data-testid="stSelectbox"] span {
+    color: white !important;
+    font-weight: bold;
+}
+
+/* Hover */
+div[data-testid="stSelectbox"] > div:hover {
+    box-shadow: 0px 0px 20px rgba(225, 6, 0, 1);
+}
+
+/* ===== MULTISELECT CINÉMA ===== */
+div[data-testid="stMultiSelect"] > div {
+    background: linear-gradient(135deg, #1a1a2e, #0b0b0f);
+    border-radius: 12px;
+    border: 1px solid #E10600;
+    box-shadow: 0px 0px 12px rgba(225, 6, 0, 0.6);
+}
+
+/* ===== SLIDER CINÉMA ===== */
+div[data-testid="stSlider"] > div > div {
+    color: #E10600;
+}
+
+/* ===== INPUT TEXTE ===== */
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea {
+    background: #0b0b0f;
+    color: white;
+    border-radius: 10px;
+    border: 1px solid #E10600;
+    box-shadow: 0 0 10px rgba(225,6,0,0.4);
+}
+
+/* ===== SELECTBOX ===== */
+div[data-testid="stSelectbox"] > div {
+    background: linear-gradient(135deg, #1a1a2e, #0b0b0f);
+    border-radius: 12px;
+    border: 1px solid #E10600;
+    box-shadow: 0px 0px 12px rgba(225, 6, 0, 0.6);
+}
+
+div[data-testid="stSelectbox"] span {
+    color: white !important;
+    font-weight: bold;
+}
+
+/* ===== MULTISELECT ===== */
+div[data-testid="stMultiSelect"] > div {
+    background: linear-gradient(135deg, #1a1a2e, #0b0b0f);
+    border-radius: 12px;
+    border: 1px solid #E10600;
+    box-shadow: 0px 0px 12px rgba(225, 6, 0, 0.6);
+}
+
+/* ===== RADIO ===== */
+div[data-testid="stRadio"] label {
+    color: white;
+    font-weight: bold;
+}
+
+/* ===== CHECKBOX ===== */
+div[data-testid="stCheckbox"] label {
+    color: white;
+    font-weight: bold;
+}
+
+/* ===== SLIDER & SELECT_SLIDER ===== */
+div[data-testid="stSlider"] > div {
+    color: #E10600;
+}
+
+/* ===== BOUTONS (déjà ok mais sécurisé) ===== */
+.stButton > button {
+    background: linear-gradient(135deg, #E10600, #7a0000);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0px 0px 15px rgba(225, 6, 0, 0.6);
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.stButton > button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 0px 25px rgba(225, 6, 0, 1);
+}
+
+/* ===== FORM ===== */
+div[data-testid="stForm"] {
+    background-color: #16161D;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    border: 1px solid #E10600;
+}
+
+/* ===== TABS (ONGLETS CONNEXION / INSCRIPTION) ===== */
+button[data-baseweb="tab"] {
+    background-color: #16161D !important;
+    color: white !important;
+    font-weight: bold;
+    border-radius: 10px 10px 0 0;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: linear-gradient(135deg, #E10600, #7a0000) !important;
+    color: white !important;
+}
+
+/* ===== EXPANDER ===== */
+div[data-testid="stExpander"] {
+    background-color: #16161D;
+    border-radius: 15px;
+    border: 1px solid #E10600;
+}
+
+/* ===== UPLOADER (si utilisé plus tard) ===== */
+div[data-testid="stFileUploader"] {
+    background-color: #16161D;
+    border-radius: 15px;
+    border: 2px dashed #E10600;
+}
+
+/* ===== OPTION MENU SIDEBAR (streamlit-option-menu) ===== */
+.nav-link {
+    color: white !important;
+    font-weight: bold;
+    border-radius: 12px;
+}
+
+.nav-link.active {
+    background: linear-gradient(135deg, #E10600, #7a0000) !important;
+}
+
+/* ===== FORCER TEXTE GLOBAL BLANC ===== */
+label, p, span, small {
+    color: #F2F2F2 !important;
+}
