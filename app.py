@@ -12,7 +12,7 @@ st.set_page_config(layout="wide",
                 initial_sidebar_state="auto")
 
 #Chargerment fichier Css
-with open(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\Projet_2\Streamlit\style.css") as f:
+with open(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\style.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # definition de quelques listes :
@@ -30,9 +30,9 @@ ALL_MOVIES = [
                     ]
 
 ALL_DOC_GENRES = [
-    "Tous",
+    "Tous", "Biographie",
     "Histoire","Nature et Environnement","Science et Technologie",
-    "Société et Culture","Biographique (Biopics)","Voyage et Exploration",
+    "Société et Culture","Voyage et Exploration",
     "Affaires Criminelles","Sport","Musique et Art","Alimentation et Cuisine","Guerre et Conflit"]
 
 
