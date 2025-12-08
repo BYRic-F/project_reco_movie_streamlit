@@ -240,7 +240,7 @@ def page_accueil() :
 
 # ------------------fonction page film ---------------
 
-def padd appage_film() :
+def page_film() :
     """ affiche la page film """    
     #initialiser les etats avant pour eviter les erreurs
     submit_titre = False
