@@ -89,8 +89,6 @@ def page_new_user1():
                         ,key="update_genres"
                     )
         with col2pref : 
-            ALL_DOC_GENRES = ["Histoire", "Nature et Environnement", "Science et Technologie", 
-                    "True Crime", "Art et Culture", "Société", "Biographie", "Voyage"]
             st.markdown("**Préférences du genre de documentaires :**")
             new_doc_genres = st.multiselect(
                 "",
@@ -182,7 +180,7 @@ def sidebar(authenticator):
             add_deco = authenticator.logout("Déconnexion")
         if st.session_state["is_guest"] is True:
             st.info("Vous êtes en mode Invité. Certaines fonctionnalités sont limitées.")
-            if st.button("Se Connecter / S'Inscrire", key="guest_to_login_btn"):
+            if st.button("Se connecter / S'inscrire", key="guest_to_login_btn"):
                 st.session_state["is_guest"] = False
                 st.rerun()
         return page_selection
@@ -242,7 +240,7 @@ def page_accueil() :
 
 # ------------------fonction page film ---------------
 
-def page_film() :
+def padd appage_film() :
     """ affiche la page film """    
     #initialiser les etats avant pour eviter les erreurs
     submit_titre = False
@@ -447,7 +445,7 @@ def page_profil() :
         col1, col2, col3 = st.columns(3)
         with col1:
         # Affichage des listes (Genre, Films, Documentaires)
-            st.markdown("**Préférences du genre de films:**")
+            st.markdown("**Préférences du genre de films :**")
             new_genres = st.multiselect(
                         "",
                         ["Action", "Comédie", "Drame", "Horreur", "Science-Fiction"]
@@ -660,7 +658,7 @@ if st.session_state["authentication_status"] is True or st.session_state["is_gue
 #
 #---------------------------------------------------------------page d'accueil non co---------------------------------------------------------------------------------------------
 else:
-    col1,col2,col3 = st.columns([6,8,5])
+    col1,col2,col3 = st.columns([7,8,5])
     with col2:  
         st.header("🎬Bienvenue sur PicquePoule🎬")
         
