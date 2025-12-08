@@ -30,7 +30,7 @@ ALL_MOVIES = [
                     ]
 
 ALL_DOC_GENRES = [
-    "Tous", "Biographie",
+    "Biographie",
     "Histoire","Nature et Environnement","Science et Technologie",
     "Société et Culture","Voyage et Exploration",
     "Affaires Criminelles","Sport","Musique et Art","Alimentation et Cuisine","Guerre et Conflit"]
@@ -47,11 +47,11 @@ def page_new_user1():
     col1_h, col2_h, col3_h = st.columns([2,5,1])
     st.markdown('---')
     with col2_h : 
-        st.markdown("## 🤩 Préparez-vous à l'Expérience PicquePoule ! 🤩")
+        st.markdown("## 🤩 Préparez-vous à l'expérience PicquePoule ! 🤩")
     st.markdown("Bienvenue ! Pour que vous puissiez profiter au maximum de notre application, nous allons vous demander de prendre juste un petit moment.")
     st.markdown(
         """
-        **T'inquiète pas, ça ira très vite, et tu ne le regretteras pas !**
+        **Ne vous inquiètez pas, ça ira très vite, et vous ne le regretterez pas !**
         
         En quelques clics seulement, vous bénéficierez de **recommandations personnalisées** spécialement conçues pour vous. Fini la perte de temps à chercher quoi regarder ; PicquePoule vous sert le meilleur contenu sur un plateau.
         
@@ -89,7 +89,7 @@ def page_new_user1():
                         ,key="update_genres"
                     )
         with col2pref : 
-            st.markdown("**Préférences du genre de documentaires :**")
+            st.markdown("**Préférences du thème des documentaires :**")
             new_doc_genres = st.multiselect(
                 "",
                 options=ALL_DOC_GENRES,
@@ -110,43 +110,48 @@ def page_new_user1():
     if submit:
         #Compréhension de liste pour recupérer les films cochés
         films_fav_selected = [movie for movie in ALL_MOVIES if st.session_state.get(movie, False) ]
-        try:
-            # Préparation des données pour l'API
-            update_payload = {
-                "username": st.session_state['username'], 
-                "genres_pref": json.dumps(new_genres), 
-                "films_fav": json.dumps(films_fav_selected), 
-                "doc_genres_pref": json.dumps(new_doc_genres), 
-                "action": "update_profile"
-            }
-            
-            st.info("Sauvegarde de vos préférences et finalisation du profil...")
-            # SHEETS_API_URL est requis ici
-            write_response = requests.post(SHEETS_API_URL, json=update_payload)
-            write_response.raise_for_status()
-            
-            response_json = write_response.json()
-            
-            if response_json.get('success'):
-                st.success("Configuration initiale terminée ! Redirection vers l'accueil...")
+        
+        if not films_fav_selected:
+            #affiche erreur avec liste vide
+            st.error("Attention : **Sélectionner au moins un film favori pour continuer.**")
+        else : 
+            try:
+                # Préparation des données pour l'API
+                update_payload = {
+                    "username": st.session_state['username'], 
+                    "genres_pref": json.dumps(new_genres), 
+                    "films_fav": json.dumps(films_fav_selected), 
+                    "doc_genres_pref": json.dumps(new_doc_genres), 
+                    "action": "update_profile"
+                }
                 
-                # Nettoyage de l'état temporaire et fin de l'onboarding
-                st.session_state["is_new_user"] = False
+                st.info("Sauvegarde de vos préférences et finalisation du profil...")
+                # SHEETS_API_URL est requis ici
+                write_response = requests.post(SHEETS_API_URL, json=update_payload)
+                write_response.raise_for_status()
                 
-                # Nettoyage des clés de checkbox des films pour éviter les conflits futurs
-                for movie in ALL_MOVIES:
-                    if movie in st.session_state:
-                        del st.session_state[movie]
+                response_json = write_response.json()
                 
-                st.cache_data.clear() 
-                st.rerun() 
-            else:
-                st.error(f"Échec de la sauvegarde : {response_json.get('error', 'Erreur inconnue')}")
-                
-        except requests.exceptions.RequestException as e:
-            st.error(f"Erreur de connexion à l'API lors de la sauvegarde : {e}")
-        except Exception as e:
-            st.error(f"Erreur inattendue : {e}")  
+                if response_json.get('success'):
+                    st.success("Configuration initiale terminée ! Redirection vers l'accueil...")
+                    
+                    # Nettoyage de l'état temporaire et fin de l'onboarding
+                    st.session_state["is_new_user"] = False
+                    
+                    # Nettoyage des clés de checkbox des films pour éviter les conflits futurs
+                    for movie in ALL_MOVIES:
+                        if movie in st.session_state:
+                            del st.session_state[movie]
+                    
+                    st.cache_data.clear() 
+                    st.rerun() 
+                else:
+                    st.error(f"Échec de la sauvegarde : {response_json.get('error', 'Erreur inconnue')}")
+                    
+            except requests.exceptions.RequestException as e:
+                st.error(f"Erreur de connexion à l'API lors de la sauvegarde : {e}")
+            except Exception as e:
+                st.error(f"Erreur inattendue : {e}")  
             
 
 # ------------------fonction SIDE BAR-----------------------------
@@ -204,16 +209,17 @@ def page_accueil() :
         """
     )
 #### qualité pop
-    with st.expander("✨ Critères de Qualité et Popularité"): 
+    with st.expander("✨ Critères de qualité et popularité"): 
         st.markdown("""
         Nous exigeons des scores de public élevés pour éliminer les contenus de faible qualité :
         
+        * **Large choix :** Environ 10 000 films.
         * **Note Moyenne :** Supérieure à **6.5/10**.
         * **Nombre de Votes :** Plus de **500 votes** enregistrés.
         """)
 
 #---- Année---
-    with st.expander("📅 Critères de Pertinence et Format"):
+    with st.expander("📅 Critères de pertinence et format"):
         st.markdown("""
         Nous assurons une sélection de contenu adapté à une séance cinéma :
         
@@ -223,12 +229,20 @@ def page_accueil() :
         """)
 
     #-----Origine film-----
-    with st.expander("🌍 Cinéma Occidental Majeur"):
+    with st.expander("🌍 Cinéma occidental"):
         st.markdown("""
         Nous avons accès aux données d'un catalogue mondial :
         
         * **Cinéma de Référence :** Films produits principalement aux **États-Unis**, au **Royaume-Uni**, en **France**, en **Allemagne**, en **Espagne** et en **Italie**.
         * **Autres Origines Diversifiées :** Nous incluons également des œuvres significatives produites au **Japon**, aux **Pays-Bas**, au **Portugal**, en **Irlande** et en **Finlande**.
+        """)
+        
+    #---Docu
+    with st.expander("🌍 Documentaires incontournables"):
+        st.markdown("""
+        Notre sélection rassemble le meilleur du cinéma documentaire. :
+        
+        * Élargissez vos horizons avec notre sélection de documentaires triés sur le volet. Nous vous proposons des œuvres **de haute qualité** et des histoires puissantes pour satisfaire votre curiosité et approfondir votre compréhension du monde.
         """)
 
     st.markdown("---")
@@ -283,10 +297,13 @@ def page_film() :
         with search_col1 :
             st.info("Voici une recommandation personnalisée surprise pour vous !")
         submit_surprise = st.button("Nouveau film surprise")
+    #gère erreur si pas defilm
+    if submit_titre and not film_write:
+        st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
     st.markdown("---")
     
     #si on clique sur recherche par titre ATTENTION IL FAUDRA INTEGRE CONDITIONS FILTRES AUSSI
-    if submit_titre: 
+    if submit_titre and film_write: 
                 #Boucle pour affichage
         COLUMNS_PER_ROW = 4
         cols = st.columns(COLUMNS_PER_ROW)
@@ -300,6 +317,7 @@ def page_film() :
                             use_container_width=True )
                 
                 st.markdown("---")
+
     
     #si on clique sur surprends moi 
     if submit_surprise : 
@@ -341,14 +359,17 @@ def page_docu():
     col1_search_t, col2_search_t, col3_search_t = st.columns(3)
     with col1_search_t: 
         st.markdown("### Comment souhaitez-vous rechercher votre documentaire ?")
+        
         choix_filtres = st.radio("",
         radio_docu
         )
         # Contenu 1ere colonne : Le choix par mot-clé 
     if choix_filtres == "Recherche par filtres":
+        st.info("Veuillez choisir le thème de votre documentaire")
         col_filt1, col_filt2= st.columns(2)
+        
         with col_filt1:
-            recherche_genre = genre = st.selectbox("Genre", ALL_DOC_GENRES)
+            recherche_genre = genre = st.selectbox("Thème", ALL_DOC_GENRES)
             duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])
     # Contenu 2e colonne : tri date ancien ou recent
         with col_filt2:
@@ -463,7 +484,7 @@ def page_profil() :
                 )
             
         with col3:
-            st.markdown("**Préférences du genre de documentaires :**")
+            st.markdown("**Préférences du thème des documentaires :**")
             new_doc_genres = st.multiselect(
                 "",
                 options=ALL_DOC_GENRES,
