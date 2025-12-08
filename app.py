@@ -693,10 +693,10 @@ else:
             password_raw = st.text_input("Mot de passe", type='password', key="reg_password")
             repeat_password = st.text_input("Répéter le mot de passe", type='password', key="reg_repeat_password")
             
-            submitted = st.form_submit_button("S'inscrire")
+            submitted_inscription = st.form_submit_button("S'inscrire")
 
     # 2. Traitement du formulaire
-    if submitted:
+    if submitted_inscription :
         # 2a. Vérifications de base
         if password_raw != repeat_password:
             st.error("Les mots de passe ne correspondent pas.")
@@ -750,7 +750,7 @@ else:
     with tab_login:
         st.subheader("Connexion")
         # Code pour la connexion (login)
-        authenticator.login(location = 'main')
+        authenticator.login(location = 'main', key = 'login_main')
             
         # Gestion de l'échec de la connexion
         if st.session_state["authentication_status"] == False:
