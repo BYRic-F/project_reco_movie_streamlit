@@ -59,24 +59,32 @@ def page_new_user1():
         """
     )
     st.markdown("---")
-    st.info("""Sélectionnez les films que vous avez aimés dans la liste ci-dessous.""")
+    st.info("""
+    **Étape 1 : Notation des films**
+    
+    Cliquez sur les étoiles pour noter les films que vous avez vus.
+    
+    **Il nous faut au moins 5 notes** pour cerner vos goûts !
+    """)
     
     
-    with st.form("Mes_films_favoris") :
+    with st.form("SVD_form") :
         COLUMNS_PER_ROW = 6
         cols = st.columns(COLUMNS_PER_ROW)
-
+        rating_keys = {} #stock les clés
         #Boucle pour affichage
         for i, movie in enumerate(ALL_MOVIES):
-            with cols[i % 6]:
+            with cols[i % COLUMNS_PER_ROW]:
                 
                 #affichage films
                 st.markdown(f"**{movie}**")
                 st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
                             use_container_width=True )
-                col1ji, col2ji, col3ji = st.columns(3)
+                col1ji, col2ji, col3ji = st.columns([1,3,1])
+                key_name = f"rate_{movie}"
+                rating_keys[movie] = key_name
                 with col2ji :
-                    st.checkbox("J'aime", key = movie)
+                    st.feedback("stars", key=key_name)
                 st.markdown("---")
         
         st.info("Définissez vos préférences : Films (genres) et Documentaires (thèmes).")
@@ -100,7 +108,7 @@ def page_new_user1():
         
         col_info1, col_info2, col_info3 = st.columns(3)
         with col_info2 :
-            st.info("Ces choix seront toujours modifiables dans la section Profil")
+            st.info("Ces choix seront toujours réinitialisables dans la section Profil")
         
         col1,col2,col3 = st.columns([5,5,1])
         with col2 :    
@@ -108,50 +116,57 @@ def page_new_user1():
 
     # Envoi des infos a Sheets        
     if submit:
-        #Compréhension de liste pour recupérer les films cochés
-        films_fav_selected = [movie for movie in ALL_MOVIES if st.session_state.get(movie, False) ]
+        # 1. Récupération et conversion des notes (0-4 -> 1-5)
+        ratings_to_send = {}
         
-        if not films_fav_selected:
-            #affiche erreur avec liste vide
-            st.error("Attention : **Sélectionner au moins un film favori pour continuer.**")
-        else : 
+        for movie, key in rating_keys.items():
+            raw_score = st.session_state.get(key)
+            if raw_score is not None:
+                final_score = raw_score + 1 
+                ratings_to_send[movie] = final_score
+        
+        # 2. VÉRIFICATION STRICTE (Le "if" que vous avez demandé)
+        if len(ratings_to_send) < 5:
+            st.error(f"🛑 Il manque des notes ! Vous n'avez noté que **{len(ratings_to_send)}** films. Veuillez en noter au moins **5** pour continuer.")
+        else:
             try:
-                # Préparation des données pour l'API
-                update_payload = {
-                    "username": st.session_state['username'], 
-                    "genres_pref": json.dumps(new_genres), 
-                    "films_fav": json.dumps(films_fav_selected), 
-                    "doc_genres_pref": json.dumps(new_doc_genres), 
+                st.info("Envoi de vos notes à l'algorithme...")
+                
+                # Envoi des notes
+                payload_ratings = {
+                    "username": st.session_state['username'],
+                    "action": "submit_ratings",
+                    "ratings": ratings_to_send
+                }
+                res_ratings = requests.post(SHEETS_API_URL, json=payload_ratings)
+                res_ratings.raise_for_status()
+                
+                # Envoi du profil
+                payload_profile = {
+                    "username": st.session_state['username'],
+                    "genres_pref": json.dumps(new_genres),
+                    "doc_genres_pref": json.dumps(new_doc_genres),
                     "action": "update_profile"
                 }
-                
-                st.info("Sauvegarde de vos préférences et finalisation du profil...")
-                # SHEETS_API_URL est requis ici
-                write_response = requests.post(SHEETS_API_URL, json=update_payload)
-                write_response.raise_for_status()
-                
-                response_json = write_response.json()
-                
-                if response_json.get('success'):
-                    st.success("Configuration initiale terminée ! Redirection vers l'accueil...")
-                    
-                    # Nettoyage de l'état temporaire et fin de l'onboarding
+                res_profile = requests.post(SHEETS_API_URL, json=payload_profile)
+                res_profile.raise_for_status()
+
+                if res_ratings.json().get('success') and res_profile.json().get('success'):
+                    st.success("Profil configuré avec succès ! Bienvenue.")
                     st.session_state["is_new_user"] = False
                     
-                    # Nettoyage des clés de checkbox des films pour éviter les conflits futurs
-                    for movie in ALL_MOVIES:
-                        if movie in st.session_state:
-                            del st.session_state[movie]
-                    
-                    st.cache_data.clear() 
-                    st.rerun() 
+                    # Nettoyage
+                    for key in rating_keys.values():
+                        if key in st.session_state:
+                            del st.session_state[key]
+                            
+                    st.cache_data.clear()
+                    st.rerun()
                 else:
-                    st.error(f"Échec de la sauvegarde : {response_json.get('error', 'Erreur inconnue')}")
-                    
-            except requests.exceptions.RequestException as e:
-                st.error(f"Erreur de connexion à l'API lors de la sauvegarde : {e}")
+                    st.error("Erreur lors de l'enregistrement côté serveur.")
+
             except Exception as e:
-                st.error(f"Erreur inattendue : {e}")  
+                st.error(f"Erreur de connexion : {e}")
             
 
 # ------------------fonction SIDE BAR-----------------------------
@@ -430,7 +445,7 @@ def page_profil() :
         "Email": st.session_state['email'],
     }
 
-    col_left, col_center, col_right = st.columns([2, 3, 1])
+    col_left, col_center, col_right = st.columns(3)
     # Affichage du titre
     with col_center:
         
@@ -459,11 +474,10 @@ def page_profil() :
 #-------------------- partie préférences-----------
     #Préférences 
     user_genres = user_data.get('genres_pref', []) 
-    user_films = user_data.get('films_fav', [])
     user_docs =  user_data.get('doc_genres_pref', [])
     with st.form("profile_update_form"):
         st.subheader("Préférences (pour les recommandations)")
-        col1, col2, col3 = st.columns(3)
+        col1, col2= st.columns(2)
         with col1:
         # Affichage des listes (Genre, Films, Documentaires)
             st.markdown("**Préférences du genre de films :**")
@@ -475,15 +489,6 @@ def page_profil() :
                     )
         
         with col2:
-            st.markdown("**Sélectionnez vos films préférés :**")
-            new_films = st.multiselect(
-                "",
-                options=ALL_MOVIES, # Utilise la liste globale de films pour eviter la casse
-                key="update_films",
-                default=user_films
-                )
-            
-        with col3:
             st.markdown("**Préférences du thème des documentaires :**")
             new_doc_genres = st.multiselect(
                 "",
@@ -503,7 +508,6 @@ def page_profil() :
                 update_payload = {
                     "username": st.session_state['username'], 
                     "genres_pref": json.dumps(new_genres), 
-                    "films_fav": json.dumps(new_films), 
                     "doc_genres_pref": json.dumps(new_doc_genres), 
                     "action": "update_profile" 
                 }
@@ -528,7 +532,25 @@ def page_profil() :
                 st.error(f"Erreur inattendue : {e}")
 
 
+# -------------------- Partie SVD (Notation & Recommandations) -------------------
+    st.subheader("Intelligence Artificielle & Recommandations")
+    
+    
+    st.info("""
+        **Optimiser vos suggestions de films**
+        
+        L'algorithme apprend de vos notes. Si vous trouvez que les recommandations ne sont pas assez précises, 
+        vous pouvez relancer l'étape de notation pour affiner votre profil IA.
+        """)
+        
 
+    col_svd_1, col_svd_2, col_svd_3 = st.columns(3)
+    with col_svd_2:
+        
+        if st.button("Recommencer la notation ⭐️", use_container_width=True):
+            #on repasse sur page new_user
+            st.session_state["is_new_user"] = True
+            st.rerun()
 
 
 
@@ -548,7 +570,7 @@ if "is_new_user" not in st.session_state:
     
         # url api google sheets
         
-SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwd0HsPF6y170qiT0Z2SodAbX2vRWqiU6s0N-0MtoV_6HUEUBnPgPWy3yoCzMA26rhQPQ/exec"
+SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQaRK6AYD4zCtkn8DvHO6mO4E7GJiG5x9YOh_C1nt7U59eZCREsGFyFnOmewMmd2g5aA/exec"
 
         # Donnees des comptes
 # --- 1. Fonction de Chargement et de Formatage des Données ---
@@ -582,7 +604,6 @@ def charger_donnees_sheets():
             try:
                 # Utilise json.loads pour convertir la chaîne de caractères en liste Python
                 genres_pref = json.loads(user_data.get('genres_pref', '[]'))
-                films_fav = json.loads(user_data.get('films_fav', '[]'))
                 doc_genres_pref = json.loads(user_data.get('doc_genres_pref', '[]'))
             except json.JSONDecodeError:
                 genres_pref = []
@@ -596,7 +617,6 @@ def charger_donnees_sheets():
                 'logged_in': False,
                 'role': user_data.get('role', 'utilisateur'),
                 'genres_pref': genres_pref, 
-                'films_fav': films_fav,
                 'doc_genres_pref': doc_genres_pref
             }
     return {'usernames': usernames}
