@@ -109,7 +109,7 @@ def page_new_user1():
 
     # Envoi des infos a Sheets        
     if submit:
-        # le feedback calcule de 0-4 doncon pase de 1a 5
+        # le feedback calcule de 0-4 doncon passe de 1a 5
         ratings_to_send = {}
         
         for movie, key in rating_keys.items():
