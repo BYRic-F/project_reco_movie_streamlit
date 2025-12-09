@@ -580,13 +580,13 @@ def charger_donnees_sheets():
     """Charge les données d'identification depuis notre base de données."""
     
     try:
-        # --- APPEL RÉEL À L'API SHEETS (GET) ---
+        # --- APPEL L'API SHEETS (GET) ---
         response = requests.get(SHEETS_API_URL)
-        response.raise_for_status() # Lève une exception si le statut HTTP est un échec (ex: 404, 500)
+        response.raise_for_status() 
         
         data_from_sheets = response.json()
         
-        # Vérification si la réponse est une liste (comme attendu par doGet)
+        # Vérification si la réponse est une liste 
         if not isinstance(data_from_sheets, list):
             st.error("Erreur de format de l'API: la réponse n'est pas une liste d'utilisateurs.")
             return {'usernames': {}}
@@ -607,7 +607,6 @@ def charger_donnees_sheets():
                 doc_genres_pref = json.loads(user_data.get('doc_genres_pref', '[]'))
             except json.JSONDecodeError:
                 genres_pref = []
-                films_fav = []
                 doc_genres_pref = []
             usernames[username] = {
                 'name': user_data.get('name'),
