@@ -6,10 +6,12 @@ from streamlit_option_menu import option_menu
 import requests
 import json
 import pandas as pd
+import fonctions_api as tmdb
 
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
                 initial_sidebar_state="auto")
+
 
 #Chargerment fichier Css
 with open(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\style.css") as f:
@@ -17,17 +19,8 @@ with open(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\style.css") as f:
 
 # definition de quelques listes :
 # liste de films les plus populaires et variés pour créer les préférences des utilisateurs
-ALL_MOVIES = [
-                "Inception", "The Dark Knight", "Interstellar", "Pulp Fiction", "The Matrix", 
-                "Fight Club", "Parasite", "Mad Max: Fury Road", "La La Land", "Joker", 
-                "Avatar", "Titanic", "Forrest Gump", "Dune", "Arrival", "Blade Runner 2049", 
-                "The Godfather", "The Shawshank Redemption", "A Beautiful Mind", 
-                "Gladiator",
-                "Spirited Away", "The Exorcist", "City of God", "Amélie", 
-                "Kill Bill: Vol. 1", "Eternal Sunshine of the Spotless Mind", 
-                "Whiplash", "No Country for Old Men", "Get Out","Narnia",
-                    
-                    ]
+df_movies = pd.read_csv(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\Projet_2\data\movies_db.csv")
+BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 ALL_DOC_GENRES = [
     "Biographie",
@@ -73,16 +66,16 @@ def page_new_user1():
         cols = st.columns(COLUMNS_PER_ROW)
         rating_keys = {} #stock les clés
         #Boucle pour affichage
-        for i, movie in enumerate(ALL_MOVIES):
+        for i,(index, row) in enumerate(df_movies.iterrows()):
             with cols[i % COLUMNS_PER_ROW]:
                 
                 #affichage films
-                st.markdown(f"**{movie}**")
-                st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            use_container_width=True )
+                st.markdown(f"**{row['title']}**")
+                st.image(BASE_URL + row['poster_path'], use_container_width=True)
                 col1ji, col2ji, col3ji = st.columns([1,3,1])
-                key_name = f"rate_{movie}"
-                rating_keys[movie] = key_name
+                #crée des id uniques pour retenir la variable
+                key_name = f"rate_{row['tmdb_id']}"
+                rating_keys[row['tmdb_id']] = key_name
                 with col2ji :
                     st.feedback("stars", key=key_name)
                 st.markdown("---")
@@ -116,7 +109,7 @@ def page_new_user1():
 
     # Envoi des infos a Sheets        
     if submit:
-        # 1. Récupération et conversion des notes (0-4 -> 1-5)
+        # le feedback calcule de 0-4 doncon pase de 1a 5
         ratings_to_send = {}
         
         for movie, key in rating_keys.items():
@@ -125,7 +118,7 @@ def page_new_user1():
                 final_score = raw_score + 1 
                 ratings_to_send[movie] = final_score
         
-        # 2. VÉRIFICATION STRICTE (Le "if" que vous avez demandé)
+        # Verifpour avoir les 5 notes où message erreur
         if len(ratings_to_send) < 5:
             st.error(f"🛑 Il manque des notes ! Vous n'avez noté que **{len(ratings_to_send)}** films. Veuillez en noter au moins **5** pour continuer.")
         else:
