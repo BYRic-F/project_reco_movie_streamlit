@@ -90,7 +90,7 @@ L'interface utilisateur permet de visualiser les données et d'obtenir des recom
 ### Lancement de l'application
 Depuis la racine du projet :
 
-```uv run streamlit run app.py```
+```streamlit run app.py```
 
 ## Fonctionnalités
 
