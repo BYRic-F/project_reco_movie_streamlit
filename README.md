@@ -96,6 +96,8 @@ Depuis la racine du projet :
 
 - Système de filtrage avancé par genre, année et note.
 
+- Gestion d'authentification
+
 - Moteur de recommandation basé sur le contenu (similarité cosinus sur les résumés lemmatisés, casting et métadonnées).
 
 - Affichage des détails du film via l'API TMDB (affiches, résumés).

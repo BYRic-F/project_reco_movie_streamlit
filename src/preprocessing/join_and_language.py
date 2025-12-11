@@ -128,7 +128,7 @@ print(f" Nan :{df_filtre.isna().sum()}")
 print('----------------------------------------------------------')
 #drop des films sans poster path ni overview
 df_filtre = df_filtre.dropna(subset=['poster_path', 'overview'])
-
+df_filtre = df_filtre.reset_index(drop= True)
 
 print(f" Nan :{df_filtre.isna().sum()}")
 
