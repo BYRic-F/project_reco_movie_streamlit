@@ -12,10 +12,12 @@ lien : https://drive.google.com/file/d/1VB5_gl1fnyBDzcIOXZ5vUSbCY68VZN1v/view?us
 
 S'assurer que uv est installé.
 
-###Installation des dépendances
-'''uv sync''
+### Installation des dépendances
+'''
+uv sync
+'''
 
-###Téléchargement du modèle NLP
+### Téléchargement du modèle NLP
 Le projet nécessite le modèle de langue anglaise de la librairie SpaCy :
 
 '''uv run python -m spacy download en_core_web_sm'''
