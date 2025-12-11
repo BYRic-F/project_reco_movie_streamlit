@@ -7,6 +7,7 @@ Ce projet utilise uv pour la gestion des dépendances et de l'environnement virt
 ### Prérequis
 Cloner le dépôt.
 
+[!WARNING]
 Télécharger la base de données tmdb, et la placer dans un dossier data/raw
 lien : https://drive.google.com/file/d/1VB5_gl1fnyBDzcIOXZ5vUSbCY68VZN1v/view?usp=sharing
 
@@ -21,10 +22,10 @@ uv sync
 Le projet nécessite le modèle de langue anglaise de la librairie SpaCy :
 
 '''uv run python -m spacy download en_core_web_sm'''
-##Architecture du Pipeline de Données
+## Architecture du Pipeline de Données
 Les scripts de transformation se trouvent dans le dossier src/. L'exécution doit suivre l'ordre chronologique ci-dessous pour garantir l'intégrité des données.
 
-###1. Découverte et Extraction Initiale
+### 1. Découverte et Extraction Initiale
 - Exploration : src/explore/decouverte_bdd_duckBDD.py
 
   - Exploration initiale des fichiers sources via DuckDB.
@@ -35,7 +36,7 @@ Les scripts de transformation se trouvent dans le dossier src/. L'exécution doi
 
   - Sortie : data/processed/dataframe_v1.csv
 
-###2. Enrichissement (Casting et Production)
+### 2. Enrichissement (Casting et Production)
 - Traitement des Principals : src/preprocessing/df_actors.py
 
   - Import de la table title.principals.
@@ -50,7 +51,7 @@ Les scripts de transformation se trouvent dans le dossier src/. L'exécution doi
 
   - Sortie : data/processed/dataframe_v2.csv
 
-###3. Transformation et Consolidation
+### 3. Transformation et Consolidation
 - Résolution des Identifiants : src/preprocessing/create_dictionnary_actor.py
 
   - Remplacement des identifiants alphanumériques (nconst) par les noms réels des personnes (acteurs, actrices, producteurs).
@@ -65,7 +66,7 @@ Les scripts de transformation se trouvent dans le dossier src/. L'exécution doi
 
   - Sortie : data/processed/dataframe_v4.csv
 
-###4. Nettoyage et Préparation ML
+### 4. Nettoyage et Préparation ML
 - Standardisation : src/preprocessing/nettoyage_df_v4.py
 
   - Regroupement des colonnes (fusion actor + actress).
@@ -82,16 +83,16 @@ Les scripts de transformation se trouvent dans le dossier src/. L'exécution doi
 
   - Sortie Finale : data/processed/dataframe_ready_for_ML.parquet
 
-##Application Streamlit
+## Application Streamlit
 
 L'interface utilisateur permet de visualiser les données et d'obtenir des recommandations.
 
-###Lancement de l'application
+### Lancement de l'application
 Depuis la racine du projet :
 
 '''uv run streamlit run app.py'''
 
-##Fonctionnalités
+## Fonctionnalités
 
 - Système de filtrage avancé par genre, année et note.
 
@@ -99,7 +100,7 @@ Depuis la racine du projet :
 
 - Affichage des détails du film via l'API TMDB (affiches, résumés).
 
-##Structure du Projet
+## Structure du Projet
 
 '''
 mon_projet/
