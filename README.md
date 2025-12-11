@@ -103,7 +103,8 @@ Depuis la racine du projet :
 
 ## Structure du Projet
 
-'''
+'''plaintext
+
 mon_projet/
 ├── app.py                  # Point d'entrée de l'application Streamlit
 ├── pyproject.toml          # Gestion des dépendances (uv)
