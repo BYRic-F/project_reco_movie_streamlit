@@ -91,7 +91,7 @@ L'interface utilisateur permet de visualiser les données et d'obtenir des recom
 ### Lancement de l'application
 Depuis la racine du projet :
 
-```uv run streamlit run app.py'''
+```uv run streamlit run app.py```
 
 ## Fonctionnalités
 
@@ -103,9 +103,9 @@ Depuis la racine du projet :
 
 ## Structure du Projet
 
-```
 
-mon_projet/
+
+```mon_projet/
 ├── app.py                  # Point d'entrée de l'application Streamlit
 ├── pyproject.toml          # Gestion des dépendances (uv)
 ├── README.md               # Documentation du projet
