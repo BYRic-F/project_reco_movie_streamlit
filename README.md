@@ -14,15 +14,14 @@ lien : https://drive.google.com/file/d/1VB5_gl1fnyBDzcIOXZ5vUSbCY68VZN1v/view?us
 S'assurer que uv est installé.
 
 ### Installation des dépendances
-'''
-bash
+```
 uv sync
-'''
+```
 
 ### Téléchargement du modèle NLP
 Le projet nécessite le modèle de langue anglaise de la librairie SpaCy :
 
-'''uv run python -m spacy download en_core_web_sm'''
+```uv run python -m spacy download en_core_web_sm```
 ## Architecture du Pipeline de Données
 Les scripts de transformation se trouvent dans le dossier src/. L'exécution doit suivre l'ordre chronologique ci-dessous pour garantir l'intégrité des données.
 
