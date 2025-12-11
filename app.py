@@ -6,7 +6,8 @@ from streamlit_option_menu import option_menu
 import requests
 import json
 import pandas as pd
-import fonctions_api as tmdb
+import os
+
 
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
@@ -14,12 +15,13 @@ st.set_page_config(layout="wide",
 
 
 #Chargerment fichier Css
-with open(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+with open("style.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # definition de quelques listes :
 # liste de films les plus populaires et variés pour créer les préférences des utilisateurs
-df_movies = pd.read_csv(r"C:\Users\frede\Vs_Code\dossier_projets\projet_test\Projet_2\data\movies_db.csv")
+csv_path = os.path.join("data", "processed", "movies_db.csv")
+df_movies = pd.read_csv(csv_path)
 BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 ALL_DOC_GENRES = [

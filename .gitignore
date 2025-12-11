@@ -1,0 +1,21 @@
+# --- Vos Données ---
+data/raw/
+
+# --- Python générique ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Environnements Virtuels (Crucial pour votre dossier .venv) ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- VS Code ---
+.vscode/
+*.code-workspace
+
+# --- Streamlit ---
+# Ignore les secrets (mots de passe, clés API)
+.streamlit/secrets.toml
