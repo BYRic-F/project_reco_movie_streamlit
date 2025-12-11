@@ -7,14 +7,15 @@ Ce projet utilise uv pour la gestion des dépendances et de l'environnement virt
 ### Prérequis
 Cloner le dépôt.
 
-[!WARNING]
-Télécharger la base de données tmdb, et la placer dans un dossier data/raw
+
+⚠️ Télécharger la base de données tmdb, et la placer dans un dossier data/raw
 lien : https://drive.google.com/file/d/1VB5_gl1fnyBDzcIOXZ5vUSbCY68VZN1v/view?usp=sharing
 
 S'assurer que uv est installé.
 
 ### Installation des dépendances
 '''
+bash
 uv sync
 '''
 
@@ -81,7 +82,7 @@ Les scripts de transformation se trouvent dans le dossier src/. L'exécution doi
 
   - Nettoyage des entités nommées (suppression des espaces pour bradpitt, sciencefiction...) afin d'optimiser la vectorisation.
 
-  - Sortie Finale : data/processed/dataframe_ready_for_ML.parquet
+  - Sortie Finale : data/processed/dataframe_ready_for_ML.pkl
 
 ## Application Streamlit
 
