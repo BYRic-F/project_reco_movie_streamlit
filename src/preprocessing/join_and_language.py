@@ -2,7 +2,7 @@ import os
 import pandas as pd
 path_v3 = os.path.join('data', 'processed', 'dataframe_v3.csv')
 output_path = os.path.join('data', 'processed', 'dataframe_v4.csv')
-
+path_tmdb = os.path.join('data', 'raw', 'tmdb_full.csv')
 
 #import dataframe v3
 dataframe_v3 = pd.read_csv(path_v3)
@@ -16,7 +16,7 @@ print(f" shape = {dataframe_v3.shape}")
 
 #import tmdb
 
-data_tmdb = pd.read_csv(r'C:\Users\frede\Vs_Code\dossier_projets\projet_test\data\raw\tmdb_full.csv')
+data_tmdb = pd.read_csv(path_tmdb)
 
 
 print(data_tmdb.head(5).to_markdown())
