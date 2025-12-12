@@ -8,8 +8,10 @@ Ce projet utilise uv pour la gestion des dépendances et de l'environnement virt
 Cloner le dépôt.
 
 
-⚠️ Télécharger la base de données tmdb, et la placer dans un dossier data/raw
+⚠️ Télécharger la base de données tmdb et le parquet, et la placer dans un dossier data/raw
 lien : https://drive.google.com/file/d/1VB5_gl1fnyBDzcIOXZ5vUSbCY68VZN1v/view?usp=sharing
+
+https://drive.google.com/file/d/1kLFsmvvgNUaZv3MQuGlKujAlYwz_V4oS/view?usp=sharing
 
 S'assurer que uv est installé.
 
