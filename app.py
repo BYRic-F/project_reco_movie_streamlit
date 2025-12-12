@@ -456,7 +456,7 @@ def page_profil() :
         st.markdown("**Identifiant :**")
         st.text(profil_utilisateur['Identifiant'])
     with col_nom:
-        st.markdown("**Nom et prénom:**")
+        st.markdown("**Nom et prénom :**")
         st.text(profil_utilisateur['Nom'])
 
 
