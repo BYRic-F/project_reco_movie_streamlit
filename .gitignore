@@ -15,7 +15,7 @@ ENV/
 # --- VS Code ---
 .vscode/
 *.code-workspace
-
+*.gz
 # --- Streamlit ---
 # Ignore les secrets (mots de passe, clés API)
 .streamlit/secrets.toml

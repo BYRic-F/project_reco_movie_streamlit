@@ -7,13 +7,14 @@ import requests
 import json
 import pandas as pd
 import os
+import joblib
 
 
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
                 initial_sidebar_state="auto")
 
-
+#-------------------------------------- CHARGEMENT DES BASES DES BDD-----------------------------------------------#
 #Chargerment fichier Css
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -21,7 +22,45 @@ with open("style.css") as f:
 # definition de quelques listes :
 # liste de films les plus populaires et variés pour créer les préférences des utilisateurs
 csv_path = os.path.join("data", "processed", "movies_db.csv")
-df_movies = pd.read_csv(csv_path)
+dataframe_path = os.path.join("data", "processed", 'dataframe_streamlit.parquet')
+
+#Chargement des bases de données
+@st.cache_data(show_spinner="Chargement du catalogue films...")
+def load_dataframe_streamlit(path):
+    """Charge et met en cache le DataFrame principal (parquet)."""
+    return pd.read_parquet(path)
+
+@st.cache_data(show_spinner="Chargement de la base de données de notation...")
+def load_movies_db(path):
+    """Charge et met en cache le DataFrame des films pour la notation (csv)."""
+    return pd.read_csv(path)
+
+df_streamlit = load_dataframe_streamlit(dataframe_path)
+df_movies = load_movies_db(csv_path)
+
+#---------chargement des modeles ------------
+#   ----- Nearest neighboors + nlp + bdd entrainement  ---------
+
+path_pipeline = os.path.join('model', 'pipeline_knn.joblib')
+path_df_ml = os.path.join('data', 'processed', 'dataframe_ready_for_ML.pkl')
+#importation de la fonction weight sinon ca ne amrche pas
+def weight_features(X, weight):
+  return X * weight
+@st.cache_data(show_spinner="Chargement du modèle de recommandation...")
+def load_knn_pipeline(path):
+    """Charge le pipeline KNN une seule fois et le met en cache."""
+    pipeline = joblib.load(path)
+    return pipeline
+ML_FEATURES = ['genres_clean','directors_clean','actor_actress_clean','NLP',  'startYear','averageRating','numVotes']
+# Appeler la fonction mise en cache pour charger le pipeline
+pipeline_knn = load_knn_pipeline(path_pipeline)
+df_knn = pd.read_pickle(path_df_ml)
+
+
+
+#----------------------------------------
+
+
 BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 ALL_DOC_GENRES = [
@@ -73,7 +112,7 @@ def page_new_user1():
                 
                 #affichage films
                 st.markdown(f"**{row['title']}**")
-                st.image(BASE_URL + row['poster_path'], use_container_width=True)
+                st.image(BASE_URL + row['poster_path'], width='stretch')
                 col1ji, col2ji, col3ji = st.columns([1,3,1])
                 #crée des id uniques pour retenir la variable
                 key_name = f"rate_{row['tmdb_id']}"
@@ -269,14 +308,16 @@ def page_film() :
     #initialiser les etats avant pour eviter les erreurs
     submit_titre = False
     submit_surprise = False
+    submit_filtre = False
+    error_films = False
     # ajout des options disponibles communes aux 2 authentifs
-    radio_choix = ["Recherche par titre",]
+    radio_choix = ["Recherche par titre","Recherche par filtres"]
     
     # Ajout des options disponibles aux utilisateurs enregistrés
     if st.session_state["authentication_status"] is True:
         radio_choix.append("Surprends moi !")
     
-    header_col1, header_col2, header_col3 = st.columns([3, 6, 1])
+    header_col1, header_col2, header_col3 = st.columns([4, 6, 1])
     with header_col2:
         st.header("🎥 Recherche de films 🎥")
     st.markdown("---")    
@@ -286,34 +327,80 @@ def page_film() :
         choix_filtres = st.radio("",
         (radio_choix
         ))
-    # Creation des filtres de recherche( genre, année, pays de production , acteurs, realisateurs, durée)
+    # Recherche par titre
     search_col1, search_col2, search_col3 = st.columns(3)   
     if choix_filtres == "Recherche par titre":
-        with search_col1 :
-            film_write = st.text_input("Entrez le titre du film que vous recherchez :")
-            
-        with st.expander("Appliquer un filtre"):
-            filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
-            with filtre_col1 :    
-                genre = st.selectbox("Genre", ["Tous", "Action", "Comédie", "Drame", "Horreur", "Science-Fiction"])
-                duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])
-            with filtre_col2 :
-                annee = st.selectbox("Année de sortie", ["Toutes", "2020", "2019", "2018", "2017", "2016"])
-            with filtre_col3 :
-                pays = st.selectbox("Pays de production", ["Tous", "USA", "France", "Royaume-Uni", "Canada", "Allemagne"])
-        submit_titre = st.button("Lancer la recherche")
+        all_titles = sorted(df_streamlit['title_final'].dropna().astype(str).str.strip().unique(),key=str.lower)
+        #all_titles = sorted(df_streamlit['title_final'].unique().tolist())
+        #with search_col1 :
+            #film_write = st.selectbox(
+                #label="Entrez le titre du film que vous recherchez :",
+                #options=['-- Sélectionner un film --'] + all_titles, 
+                #index=0, 
+                #key="autocomplete_movie_select")
+                #key="autocomplete_movie_select")
+        with radio_col2 :
+            st.markdown("<div style='height:85px'></div>",unsafe_allow_html=True)
+            query = st.text_input(label ="Entrez le titre du film")
+            film_write = None
+            if query:
+                q = query.lower()
+                exact = [t for t in all_titles if t.lower() == q]
+                starts = [t for t in all_titles if t.lower().startswith(q) and t not in exact]
+                contains = [t for t in all_titles if q in t.lower() and t not in exact + starts]
+
+                results = exact + sorted(starts, key=str.lower) + sorted(contains, key=str.lower)
+    # selectbox sur les film filtré
+                if results:
+                    film_write = st.selectbox("Résultats", options=results[:20])
+                else:
+                    error_films = st.error("Aucun film trouvé, merci de réessayer.")
+
+            if not submit_titre and query and error_films == False: #and film_write == '-- Sélectionner un film --': 
+                st.info("Sélectionnez un titre et cliquez sur 'Lancer la recherche'.")
+        with radio_col2 :
+            button1, button2, button3 = st.columns([2,3,1])
+            with button2 :
+                submit_titre = st.button("Lancer la recherche") 
+        
+    # Creation des filtres de recherche( genre, année, pays de production , acteurs, realisateurs, durée)
+    if choix_filtres == "Recherche par filtres" :
+        filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
+        with filtre_col1 :    
+            genre = st.selectbox("Genre", df_streamlit['genres'].explode().unique())
+            actor = st.selectbox("Acteurs", df_streamlit['actor_actress'].explode().unique())
+        with filtre_col2 :
+            annee = st.selectbox("Année de sortie", df_streamlit['startYear'].unique())
+            producteur = st.selectbox("Producteurs", df_streamlit['producer'].explode().unique())
+            st.info("Sélectionnez vos filtres ! ")
+            button1, button2, button3 = st.columns([2,3,1])
+            with button2 :
+                submit_filtre = st.button("Lancer la recherche")  
+        with filtre_col3 :
+            pays = st.selectbox("Pays de production", df_streamlit['original_language'].unique())
+            duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
         
     if choix_filtres == "Surprends moi !":
-        with search_col1 :
+        with radio_col2:
+            st.markdown("<div style='height:110px'></div>",unsafe_allow_html=True)
             st.info("Voici une recommandation personnalisée surprise pour vous !")
-        submit_surprise = st.button("Nouveau film surprise")
-    #gère erreur si pas defilm
-    if submit_titre and not film_write:
-        st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
+            col_but1, colbut2, colbut3 = st.columns([3,6,1])
+            with colbut2 :
+                submit_surprise = st.button("Nouveau film surprise")
+    #gère erreur si pas de film
+    #if submit_titre == '-- Sélectionner un film --':
+        #st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
     st.markdown("---")
     
     #si on clique sur recherche par titre ATTENTION IL FAUDRA INTEGRE CONDITIONS FILTRES AUSSI
-    if submit_titre and film_write: 
+    if submit_titre and film_write : # and film_write != '-- Sélectionner un film --': 
+        index = df_streamlit[df_streamlit['title_final'].str.lower() == film_write.strip().lower()].index[0]
+        movie_data_for_ml = df_knn.iloc[[index]][ML_FEATURES]
+        distances, indices = pipeline_knn[1].kneighbors(
+                pipeline_knn[0].transform(movie_data_for_ml))
+        recommended_indices = indices[0][1:5] 
+        recommended_df = df_streamlit.iloc[recommended_indices]
+        st.write(recommended_df)
                 #Boucle pour affichage
         COLUMNS_PER_ROW = 4
         cols = st.columns(COLUMNS_PER_ROW)
@@ -324,10 +411,18 @@ def page_film() :
                 #affichage films
                 st.markdown(f"**{movie}**")
                 st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            use_container_width=True )
+                            width='stretch' )
                 
                 st.markdown("---")
-
+        #erreur si aucun film entrer
+    if submit_titre and film_write == '-- Sélectionner un film --':           
+        st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
+    
+    #si on clique sur recherche par filtre
+    
+    if submit_filtre :
+                #Boucle pour affichage
+        st.write(df_streamlit[df_streamlit['startYear']== annee])
     
     #si on clique sur surprends moi 
     if submit_surprise : 

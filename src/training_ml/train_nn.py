@@ -6,7 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
-
+import joblib
 
 path_df_ml = os.path.join('data', 'processed', 'dataframe_ready_for_ML.pkl')
 df = pd.read_pickle(path_df_ml)
@@ -73,7 +73,7 @@ preprocessor = ColumnTransformer(
         # Chiffres
         ('num', Pipeline([
             ('scaler', MinMaxScaler()),
-            ('weight', FunctionTransformer(weight_features, kw_args={'weight': 1}))
+            ('weight', FunctionTransformer(weight_features, kw_args={'weight': 1.5}))
             ]), ['startYear', 'averageRating', 'numVotes'])
     ],
 )
@@ -89,6 +89,11 @@ print(pipeline)
 print("Début du train")
 pipeline.fit(df_nn)
 print("Train reussi")
+
+# Sauvegarde du modèle
+joblib_path = os.path.join('model', 'pipeline_knn.joblib')
+joblib.dump(pipeline, joblib_path)
+print(f"Modèle sauvegardé dans : {joblib_path}")
 
 distances, indices = pipeline[1].kneighbors(
     pipeline[0].transform(df_nn.iloc[[5000]])
