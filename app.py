@@ -408,15 +408,21 @@ def sidebar(authenticator):
     # Creation de la sidebar "modulabe"
         # condition d'affichage selon le statut
         if st.session_state["authentication_status"] is True:
-            st.write(f"Bienvenu : {st.session_state['name']}")
+            colleft, colcen, colrig = st.columns([1,10,1])
+            with colcen :
+                st.write(f"Bienvenu : {st.session_state['name']}")
         if st.session_state["is_guest"] is True:
-            st.write("Bienvenu : Invité")
+            colleft1, colcen1, colrig1= st.columns([1,5,1])
+            with colcen1 :
+                st.write("Bienvenu : Invité")
         page_selection = option_menu(
         menu_title = None, options =
         base_option,
         icons = base_icons)
         if st.session_state["authentication_status"] is True:
-            add_deco = authenticator.logout("Déconnexion")
+            colleft1, colcen1, colrig1= st.columns([1.5,5,1])
+            with colcen1 :
+                add_deco = authenticator.logout("Déconnexion")
         if st.session_state["is_guest"] is True:
             st.info("Vous êtes en mode Invité. Certaines fonctionnalités sont limitées.")
             if st.button("Se connecter / S'inscrire", key="guest_to_login_btn"):
@@ -429,7 +435,7 @@ def sidebar(authenticator):
 
 def page_accueil() :
     """ affiche la page d'accueil"""
-    col1_h, col2_h, col3_h = st.columns([2,5,1])
+    col1_h, col2_h, col3_h = st.columns([1.5,5,1])
     with col2_h :
         st.header("🎬Bienvenue sur votre plateforme PicquePoule🎬")
     st.markdown("---")
