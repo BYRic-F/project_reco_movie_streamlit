@@ -14,6 +14,8 @@ import random
 
 API_KEY = "99dea9a9dd2b4d7d7f47e9a0cdd160f7"
 
+SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQaRK6AYD4zCtkn8DvHO6mO4E7GJiG5x9YOh_C1nt7U59eZCREsGFyFnOmewMmd2g5aA/exec"
+
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
                 initial_sidebar_state="auto")
@@ -68,6 +70,29 @@ def load_svd_model(path):
     return joblib.load(path)
 
 model_svd = load_svd_model(path_svd)
+
+#-------------------- FOnciton filtre genre ---------------------------------------------------------
+def filtrer_films(df, genre, annee, pays, acteur, producteur, duree):
+    df_res = df.copy()
+    if genre and genre != "Tous":
+        df_res = df_res[df_res['genres'].apply(lambda x: genre in x)]
+    if acteur and acteur != "Tous":
+        df_res = df_res[df_res['actor_actress'].apply(lambda x: acteur in x)]
+    if producteur and producteur != "Tous":
+        df_res = df_res[df_res['producer'].apply(lambda x: producteur in x)]
+    if annee and annee != "Tous":
+        df_res = df_res[df_res['startYear'] == annee]
+    if pays and pays != "Tous":
+        df_res = df_res[df_res['original_language'] == pays]
+    if duree and duree != "Toutes":
+        if duree == "Moins de 90 min":
+            df_res = df_res[df_res['runtimeMinutes'] < 90]
+        elif duree == "90-120 min":
+            df_res = df_res[(df_res['runtimeMinutes'] >= 90) & (df_res['runtimeMinutes'] <= 120)]
+        elif duree == "Plus de 120 min":
+            df_res = df_res[df_res['runtimeMinutes'] > 120]
+    return df_res
+
 
 #-----------------------------  Creation fonction svd : récupérer note + pred ------------------------------
 
@@ -134,9 +159,24 @@ ALL_DOC_GENRES = [
     "Société et Culture","Voyage et Exploration",
     "Affaires Criminelles","Sport","Musique et Art","Alimentation et Cuisine","Guerre et Conflit"]
 
+#--------------------------------------Fonction sauvegarde note----------------------------
 
+def envoyer_note(movie_id, score, movie_title, username):
+    payload_rate = {
+        "action": "submit_ratings",
+        "username": username,
+        "ratings": {str(movie_id): int(score)}
+    }
+    try:
+        res = requests.post(SHEETS_API_URL, json=payload_rate)
+        if res.status_code == 200:
+            st.toast(f"Note de {score}/5 enregistrée pour {movie_title} !", icon="✅")
+        else:
+            st.error("Erreur lors de l'envoi.")
+    except Exception as e:
+        st.error(f"Erreur de connexion : {e}")
 
-#----------------------------------------Creation fonction Api--------------------------------- 
+#----------------------------------------Creation fonction Api tmdb--------------------------------- 
 
 # Fonction pour récupérer les détails d'un film par ID
 def obtenir_details_film(film_id):
@@ -493,32 +533,45 @@ def page_accueil() :
 
 # ------------------fonction page film ---------------
 
-def page_film() :
+def page_film():
     """ affiche la page film """    
     #initialiser les etats avant pour eviter les erreurs
-    submit_titre = False
     submit_surprise = False
     submit_filtre = False
     error_films = False
+    if 'search_active' not in st.session_state:
+        st.session_state.search_active = False
+
+    
     # ajout des options disponibles communes aux 2 authentifs
     radio_choix = ["Recherche par titre","Recherche par filtres"]
     
     # Ajout des options disponibles aux utilisateurs enregistrés
     if st.session_state["authentication_status"] is True:
         radio_choix.append("Surprends moi !")
+    
     header_col1, header_col2, header_col3 = st.columns([4, 6, 1])
     with header_col2:
         st.header("🎥 Recherche de films 🎥")
     st.markdown("---")    
+    
     radio_col1, radio_col2, radio_col3= st.columns(3)
     with radio_col1: 
         st.markdown("### Comment souhaitez-vous rechercher votre film ?")
-        choix_filtres = st.radio("",
-        (radio_choix
-        ))
+        choix_filtres = st.radio("", (radio_choix))
+    
+    # Si on change de mode de recherche, on réinitialise la mémoire sinon affiche persiste
+    if choix_filtres != "Recherche par titre":
+        st.session_state.search_active = False
+        
+    if choix_filtres != "Recherche par filtres":
+        if 'resultats_filtre_memoire' in st.session_state:
+            del st.session_state['resultats_filtre_memoire']
+
     if choix_filtres != "Surprends moi !" and 'film_surprise_actuel' in st.session_state:
         del st.session_state['film_surprise_actuel']
-    # Recherche par titre
+        
+# AFFIcgha ge  Recherche par titre--------
     search_col1, search_col2, search_col3 = st.columns(3)   
     if choix_filtres == "Recherche par titre":
         all_titles = sorted(df_streamlit['title_final'].dropna().astype(str).str.strip().unique(),key=str.lower)
@@ -533,65 +586,63 @@ def page_film() :
                 contains = [t for t in all_titles if q in t.lower() and t not in exact + starts]
 
                 results = exact + sorted(starts, key=str.lower) + sorted(contains, key=str.lower)
-    # selectbox sur les film filtré
+                
                 if results:
                     film_write = st.selectbox("Résultats", options=results[:20])
                 else:
                     error_films = st.error("Aucun film trouvé, merci de réessayer.")
 
-            if not submit_titre and query and error_films == False: #and film_write == '-- Sélectionner un film --': 
+            # Si la recherche n'est pas active, on affiche le message d'info
+            if not st.session_state.search_active and query and error_films == False: 
                 st.info("Sélectionnez un titre et cliquez sur 'Lancer la recherche'.")
-        with radio_col2 :
-            button1, button2, button3 = st.columns([2,3,1])
-            with button2 :
-                submit_titre = st.button("Lancer la recherche") 
         
-    # Creation des filtres de recherche( genre, année, pays de production , acteurs, realisateurs, durée)
-    genres_traduits = {
-    "Action": "Action",
-    "Adult": "Adulte",
-    "Adventure": "Aventure",
-    "Animation": "Animation",
-    "Biography": "Biographie",
-    "Comedy": "Comédie",
-    "Crime": "Crime",
-    "Documentary": "Documentaire",
-    "Drama": "Drame",
-    "Family": "Famille",
-    "Fantasy": "Fantastique",
-    "History": "Histoire",
-    "Horror": "Horreur",
-    "Music": "Musique",
-    "Musical": "Comédie musicale",
-    "Mystery": "Mystère",
-    "News": "Actualités",
-    "Romance": "Romance",
-    "Sci-Fi": "Science-fiction",
-    "Sport": "Sport",
-    "Thriller": "Thriller",
-    "War": "Guerre",
-    "Western": "Western"
-}
-    if choix_filtres == "Recherche par filtres" :
-        filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
-        with filtre_col1:
-    # affiche en fr
-            choix_fr = st.selectbox("Genre", sorted(genres_traduits.values()))
-    
-    # On recup en ang pour pas causer d'erreurs dans le df
-            genre_anglais = [ang for ang, fr in genres_traduits.items() if fr == choix_fr][0]
-            
-            actor = st.selectbox("Acteurs", df_streamlit['actor_actress'].explode().unique())
-        with filtre_col2 :
-            annee = st.selectbox("Année de sortie", df_streamlit['startYear'].unique())
-            producteur = st.selectbox("Producteurs", df_streamlit['producer'].explode().unique())
-            st.info("Sélectionnez vos filtres ! ")
+        with radio_col2 :
+            message_placeholder = st.empty()
             button1, button2, button3 = st.columns([2,3,1])
             with button2 :
-                submit_filtre = st.button("Lancer la recherche")  
-        with filtre_col3 :
-            pays = st.selectbox("Pays de production", df_streamlit['original_language'].unique())
-            duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
+                # bouton lance et active memoire pour search_active
+                if st.button("Lancer la recherche"):
+                    if not query:            
+                            message_placeholder.error("Veuillez saisir un titre de film.")
+                    else :
+                        st.session_state.search_active = True
+
+#----- Affichage recherche par filre
+    # Trad
+    genres_traduits = { 
+    "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
+    "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Documentaire",
+    "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
+    "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
+    "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
+    "Thriller": "Thriller", "War": "Guerre", "Western": "Western"
+    }
+    if choix_filtres == "Recherche par filtres" :
+        #pror eviter refresh
+        with st.form(key= 'form_filtres_films') :
+            filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
+            with filtre_col1:
+                choix_fr = st.selectbox("Genre", ['Tous'] + sorted(genres_traduits.values()))
+                if choix_fr == "Tous":
+                    genre_anglais = "Tous"
+                else :
+                    genre_anglais = [ang for ang, fr in genres_traduits.items() if fr == choix_fr][0]
+                actor = st.selectbox("Acteurs", ['Tous'] + sorted(df_streamlit['actor_actress'].explode().dropna().unique().tolist()))
+            with filtre_col2 :
+                annee = st.selectbox("Année de sortie", ["Tous"] + sorted(df_streamlit['startYear'].dropna().unique().tolist(), reverse=True))
+                producteur = st.selectbox("Producteurs", ["Tous"] + sorted(df_streamlit['producer'].explode().dropna().unique().tolist()))
+                st.info("Sélectionnez vos filtres ! ")
+                button1, button2, button3 = st.columns([2,3,1])
+                with button2 :
+                    submit_filtre = st.form_submit_button("Lancer la recherche", type="primary")
+            with filtre_col3 :
+                pays = st.selectbox("Pays de production",['Tous'] + sorted(df_streamlit['original_language'].dropna().unique().tolist()))
+                duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
+        
+    
+    
+    
+#---------------- Affichage Surprends moi page film
         
     if choix_filtres == "Surprends moi !":
         with radio_col2:
@@ -601,45 +652,205 @@ def page_film() :
             with colbut2 :
                 submit_surprise = st.button("Nouveau film surprise")
     st.markdown("---")
-    
-    #si on clique sur recherche par titre ATTENTION IL FAUDRA INTEGRE CONDITIONS FILTRES AUSSI
-    if submit_titre and film_write:
+#------- Calcul Recherche titre Knn
+    # condtion memoire
+    if st.session_state.search_active and film_write:
+        
         # 1. CALCUL KNN
         index = df_streamlit[df_streamlit['title_final'].str.lower() == film_write.strip().lower()].index[0]
         movie_data_for_ml = df_knn.iloc[[index]][ML_FEATURES]
         distances, indices = pipeline_knn[1].kneighbors(pipeline_knn[0].transform(movie_data_for_ml))
         
-        # On récupère les 4 films les plus proches (index 1 à 4)
         reco_df = df_streamlit.iloc[indices[0][1:5]]
-
+        
         st.markdown(f"### 🎯 Films recommandés pour : {film_write}")
         st.markdown("---")
 
-        # boucle pour afficher
+        # chargement user note comme surprends moi
+        user_real_ratings = {}
+        ids_deja_vus = set()
+        if st.session_state.get("authentication_status") is True:
+            try:
+                username = st.session_state['username']
+                url_api = f"{SHEETS_API_URL}?action=get_user_ratings&username={username}"
+                response = requests.get(url_api)
+                if response.status_code == 200:
+                    user_real_ratings = response.json()
+                    def nettoyer_id(val):
+                        try: return str(int(float(val)))
+                        except: return str(val).strip()
+                    ids_deja_vus = set(nettoyer_id(k) for k in user_real_ratings.keys())
+            except: pass
+
+        # affichage 4 films
         for i, (idx, row) in enumerate(reco_df.iterrows()):
-            # Utilisation de l'ID TMDB présent dans le pickle
             f_id = row['id']
-            
-            # appel fonctions api
             details = obtenir_details_film(f_id)
             
             if details and "id" in details:
-                # Récupération du cast et crew
+                # Récup API TMDB 
                 credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
                 credits = requests.get(credits_url).json()
-                
-                # Extraction des infos
                 annee = details.get('release_date', '????')[:4]
                 genres = ", ".join([g['name'] for g in details.get('genres', [])])
                 directors = [m["name"] for m in credits.get("crew", []) if m["job"] == "Director"]
                 cast = [a["name"] for a in credits.get("cast", [])[:5]]
                 
-                # Mise en page
+                col1, col2 = st.columns([1, 3]) 
+                with col1:
+                    poster = details.get("poster_path")
+                    if poster: st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
+                
+                with col2:
+                    col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
+                    with col2mov:
+                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                        st.subheader(f"{i+1}. {details.get('title')}")
+                        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+                        st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres} | 🕒 **Durée :** {details.get('runtime')} minutes")
+                        st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
+                        st.write(f"👥 **Acteurs :** {', '.join(cast)}")
+                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
+                        resume = details.get('overview')
+                        if not resume or resume.strip() == "":
+                            details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
+                            resume = details_en.get('overview', 'Aucun résumé.')
+                        st.write(f"📖 **Résumé :** {resume}")
+                        
+                        # focntion premium "regarder cefilm"
+                        if st.session_state.get("authentication_status") is True:
+                            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                            st.success("🎯 **Améliorez vos résultats :** Cliquez sur 'Je regarde ce film' pour que l'algorithme comprenne ce que vous aimez !")
+                            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                            f_id_str = str(int(float(f_id)))
+                            
+                            #  Déjà vu ? on l'affiche
+                            if f_id_str in ids_deja_vus:
+                                note_mise = user_real_ratings.get(f_id_str, "?")
+                                st.success(f"✅ Déjà vu (Note : {note_mise}/5)")
+                            
+                            # 2. Pas vu ? Affiche les boutons de choix
+                            else:
+                                col_btn_w, col_btn_s = st.columns(2)
+                                
+                                # Bouton Watchlist
+                                with col_btn_w:
+                                    if st.button("🍿 Je regarde !", key=f"reco_w_{f_id}_{i}", use_container_width=True):
+                                        payload = {"action": "add_watchlist", "username": st.session_state['username'], "movie_id": f_id_str}
+                                        requests.post(SHEETS_API_URL, json=payload)
+                                        st.toast("Ajouté !")
+
+                                # Bouton Notation formulaire pour eviter rerun 
+                                with col_btn_s:
+                                    with st.popover("✅ J'ai déjà vu", width='stretch'):
+                                        st.write(f"Notez **{details.get('title')}**")
+                                        
+                                        # Le formulaire bloque le rechargement quand on clique sur l'étoile sinon ca rerun
+                                        with st.form(key=f"frm_rt_{f_id}_{i}"):
+                                            rating_val = st.feedback("stars", key=f"reco_rate_{f_id}_{i}")
+                                            submitted_search = st.form_submit_button("Valider", type="primary")
+                                        #envoi
+                                        if submitted_search:
+                                            if rating_val is not None:
+                                                try:
+                                                    payload_rate = {
+                                                        "action": "submit_ratings",
+                                                        "username": st.session_state['username'],
+                                                        "ratings": {f_id_str: rating_val + 1}
+                                                    }
+                                                    requests.post(SHEETS_API_URL, json=payload_rate)
+                                                    st.toast("Note enregistrée !")
+                                                    st.rerun() # Pour rafraîchir l'affichage en "Déjà vu"
+                                                except Exception as e:
+                                                    st.error(f"Erreur : {e}")
+
+            st.markdown("---")
+
+                    # ----------------------------------------------
+
+
+
+    #-----------Calcul recherche filtre-------------------
+    
+    if submit_filtre:
+        # On calcule les résultats
+        resultats = filtrer_films(
+            df_streamlit, 
+            genre=genre_anglais, 
+            annee=annee, 
+            pays=pays, 
+            acteur=actor, 
+            producteur=producteur, 
+            duree=duration
+        )
+        
+        # Gestion des résultats vides
+        if resultats.empty:
+            st.warning("Aucun film ne correspond exactement à tous ces critères combinés. Essayez d'en enlever un !")
+            # On nettoie la mémoire pour ne pas laisser de vieux résultats
+            if 'resultats_filtre_memoire' in st.session_state:
+                del st.session_state['resultats_filtre_memoire']
+        else:
+            #
+            nb = len(resultats)
+            nb_a_afficher = min(nb, 20)
+            #Gestkl de sessions_state pour l'envoi de notes
+            st.session_state['resultats_filtre_memoire'] = resultats.sample(n=nb_a_afficher)
+            st.session_state['nb_resultats_filtre'] = nb
+
+    if 'resultats_filtre_memoire' in st.session_state:
+        
+        films_affi = st.session_state['resultats_filtre_memoire']
+        nb_total = st.session_state.get('nb_resultats_filtre', 0)
+        
+        st.success(f"🎯 {nb_total} film(s) trouvé(s) !")
+
+        # chargement user et notes
+        user_real_ratings = {}
+        ids_deja_vus = set()
+        
+        if st.session_state.get("authentication_status") is True:
+            try:
+                username = st.session_state['username']
+                url_api = f"{SHEETS_API_URL}?action=get_user_ratings&username={username}"
+                response = requests.get(url_api)
+                if response.status_code == 200:
+                    user_real_ratings = response.json()
+                    def nettoyer_id(val):
+                        try: return str(int(float(val)))
+                        except: return str(val).strip()
+                    ids_deja_vus = set(nettoyer_id(k) for k in user_real_ratings.keys())
+            except: 
+                pass
+
+        # affichage comme dh'ab
+        for i, (idx, row) in enumerate(films_affi.iterrows()):
+            try: f_id = str(int(float(row['id'])))
+            except: continue
+
+            # Appel API TMDB
+            details = obtenir_details_film(f_id)
+            
+            if details and "id" in details:
+                # Récup Crédits
+                try:
+                    credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
+                    credits_data = requests.get(credits_url).json()
+                    directors = [m["name"] for m in credits_data.get("crew", []) if m["job"] == "Director"]
+                    cast = [a["name"] for a in credits_data.get("cast", [])[:5]]
+                except:
+                    directors, cast = [], []
+
+                annee_film = details.get('release_date', '????')[:4]
+                genres_film = ", ".join([g['name'] for g in details.get('genres', [])])
+                
+                # Mise en page Colonnes
                 col1, col2 = st.columns([1, 3]) 
                 
                 with col1:
                     poster = details.get("poster_path")
-                    if poster:
+                    if poster: 
                         st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
                 
                 with col2:
@@ -647,39 +858,78 @@ def page_film() :
                     with col2mov:
                         st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
                         st.subheader(f"{i+1}. {details.get('title')}")
-                        
-                        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
-                        st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres}")
+                        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+                        st.write(f"📅 **Année :** {annee_film} | 🎭 **Genres :** {genres_film} | 🕒 **Durée :** {details.get('runtime')} minutes")
                         st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
                         st.write(f"👥 **Acteurs :** {', '.join(cast)}")
-                        
-                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-                        # Gestion du résumé car certaion apparaissent pas
+                        # Résumé
                         resume = details.get('overview')
-                        is_english = False
-
                         if not resume or resume.strip() == "":
-                            details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
-                            resume = details_en.get('overview', 'Aucun résumé disponible.')
-                            is_english = True
-
-                        if is_english:
-                            st.caption("🇬🇧 *Résumé uniquement disponible en anglais*")
+                            try:
+                                details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
+                                resume = details_en.get('overview', 'Aucun résumé.')
+                            except: resume = "Pas de résumé."
                         
+                        # Tronquer résumé si trop long
+                        if len(resume) > 400: resume = resume[:400] + "..."
                         st.write(f"📖 **Résumé :** {resume}")
+                        
+                        # --- ZONE ACTIONS (Utilisateur connecté) ---
+                        if st.session_state.get("authentication_status") is True:
+                            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                            st.success("🎯 **Améliorez vos résultats :** Cliquez sur 'Je regarde ce film' pour que l'algorithme comprenne ce que vous aimez !")
+                            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                            # 1. Déjà vu ?
+                            if f_id in ids_deja_vus:
+                                note_mise = user_real_ratings.get(f_id, "?")
+                                st.success(f"✅ Déjà vu (Note : {note_mise}/5)")
+                            
+                            # 2. Pas vu ? Boutons d'action
+                            else:
+                                col_btn_w, col_btn_s = st.columns(2)
+                                
+                                # BOUTON WATCHLIST
+                                with col_btn_w:
+                                    if st.button("🍿 Je regarde !", key=f"reco_w_filt_{f_id}_{i}", use_container_width=True):
+                                        try:
+                                            payload = {"action": "add_watchlist", "username": st.session_state['username'], "movie_id": f_id}
+                                            requests.post(SHEETS_API_URL, json=payload)
+                                            st.toast("Ajouté !", icon="✅")
+                                        except Exception as e:
+                                            st.error(f"Erreur : {e}")
 
+                                # BOUTON NOTATION
+                                with col_btn_s:
+                                    with st.popover("✅ J'ai déjà vu", width='stretch'):
+                                        st.write(f"Notez **{details.get('title')}**")
+                                        
+                                        with st.form(key=f"frm_rt_filt_{f_id}_{i}"):
+                                            rating_val = st.feedback("stars", key=f"reco_rate_filt_{f_id}_{i}")
+                                            submitted_rate = st.form_submit_button("Valider", type="primary")
+                                            
+                                            if submitted_rate:
+                                                if rating_val is not None:
+                                                    try:
+                                                        payload_rate = {
+                                                            "action": "submit_ratings",
+                                                            "username": st.session_state['username'],
+                                                            "ratings": {f_id: rating_val + 1}
+                                                        }
+                                                        res = requests.post(SHEETS_API_URL, json=payload_rate)
+                                                        if res.status_code == 200:
+                                                            st.toast("Note enregistrée !")
+                                                            st.rerun()
+                                                    except Exception as e:
+                                                        st.error(f"Erreur : {e}")
+            
             st.markdown("---")
-
-
-    #si on clique sur recherche par filtre
+            
+            
     
-    if submit_filtre :
-                #Boucle pour affichage
-        st.write(df_streamlit[df_streamlit['startYear']== annee])
-    
-    #si on clique sur surprends moi 
-# ... dans la section "Surprends moi !" de page_film ...
+    #-------Calcules surprends moi ------
+
 
     # 1 on calcule quand on clique sur le bouton
     if submit_surprise:
@@ -739,9 +989,6 @@ def page_film() :
         details = obtenir_details_film(f_id)
         
         if details and "id" in details:
-            if submit_surprise: 
-                st.balloons()
-            
             st.success(f"✨ Basé sur vos {nb_notes} films notés !")
 
             # Récupération Crédits
@@ -770,7 +1017,7 @@ def page_film() :
                     st.subheader(f"{i+1}. {details.get('title')}")
                     
                     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-                    st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres}")
+                    st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres}  | 🕒 **Durée :** {details.get('runtime')} minutes")
                     st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
                     st.write(f"👥 **Acteurs :** {', '.join(cast)}")
                     
@@ -813,16 +1060,24 @@ def page_film() :
 
                         # COLONNE 2 : BOUTON DEJA VU + NOTATION
                         with col_btn_seen:
-                            # petit popover
+                            # On garde le popover
                             with st.popover("✅ J'ai déjà vu", width='stretch'):
                                 st.markdown(f"**Notez :** {details.get('title')}")
                                 
-                                # Les étoiles (0-4 par défaut, donc on ajoutera +1)
-                                rating_val = st.feedback("stars", key=f"feed_rate_{f_id}")
-                                
-                                if st.button("Valider la note", key=f"btn_send_rate_{f_id}", type="primary"):
+                                # --- AJOUT DU FORMULAIRE ICI ---
+                                # Le formulaire empêche le rerun immédiat au clic sur les étoiles
+                                with st.form(key=f"form_rating_{f_id}"):
+                                    
+                                    # L'étoile ne rechargera plus la page grâce au formulaire
+                                    rating_val = st.feedback("stars", key=f"feed_rate_{f_id}")
+                                    
+                                    # Ce bouton déclenche l'envoi et le rerun en une seule fois
+                                    submitted = st.form_submit_button("Valider la note", type="primary")
+                                    
+                                # --- LOGIQUE APRÈS VALIDATION ---
+                                if submitted:
                                     if rating_val is not None:
-                                        final_score = rating_val + 1  # vonversion 0-4 vers 1-5
+                                        final_score = rating_val + 1
                                         
                                         with st.spinner("Envoi..."):
                                             try:
@@ -832,30 +1087,30 @@ def page_film() :
                                                     "ratings": {str(int(float(f_id))): final_score}
                                                 }
                                                 res = requests.post(SHEETS_API_URL, json=payload_rate)
+                                                
                                                 if res.status_code == 200:
                                                     st.toast(f"Note de {final_score}/5 enregistrée !")
+                                                    #pour relancer
+                                                    if 'film_surprise_actuel' in st.session_state:
+                                                        del st.session_state['film_surprise_actuel']
+                                                    st.rerun() 
                                                 else:
                                                     st.error("Erreur API")
                                             except Exception as e:
                                                 st.error(f"Erreur : {e}")
                                     else:
                                         st.warning("Veuillez sélectionner au moins une étoile.")
-            st.markdown("---")
+                st.markdown("---")
         
 #----------------------------------------fonciton Page_docu-------------------------------------
 
     
 def page_docu():
     """ Affichage page docu"""
-    #Initalise etat
     submit_doc_fil = False
-    submit_doc_sur = False
     #Selection selon l'authentif
     
     radio_docu = ['Recherche par filtres']
-    # Ajout des options disponibles aux utilisateurs enregistrés
-    if st.session_state["authentication_status"] is True:
-        radio_docu.append("Surprends moi !")
     col_head_doc, col2_head_doc, col3_head_doc = st.columns([3,6,1])
     
     ## affichage titre
@@ -886,18 +1141,9 @@ def page_docu():
             ["Toutes les années","Moins de 1 an (Très Récent)",
     "Moins de 5 ans (Contemporain)","Moins de 10 ans",
     "Après 2000","1990 - 2000 (Classique)"])
-                  
+                
         submit_doc_fil = st.button("Lancer la recherche")
-    
-    # Contenu surprend moi (uniquement user enregistré)    
-    if choix_filtres == "Surprends moi !":
-        col_surprise, col_surprise2, col_surpri_3 = st.columns(3)
-        with col_surprise :
-            st.info("Voici une recommandation personnalisée surprise pour vous !")
-        submit_doc_sur = st.button("Nouveau documentaire surprise")
-    st.markdown("---") 
-    
-    
+
     #### SI recherche par filtre ATTENtion il faudra rajouter les conditions filtres
     if submit_doc_fil: 
         LIST_TEST_DOCU = ["coucou", 'blou']
@@ -914,21 +1160,6 @@ def page_docu():
                 
                 st.markdown("---")
                 
-    ### SI Surprends moi 
-    if submit_doc_sur: 
-        LIST_TEST_DOCU = ["coucou", 'blou']
-        COLUMNS_PER_ROW = 2
-        cols = st.columns(COLUMNS_PER_ROW)
-
-        for i, movie in enumerate(LIST_TEST_DOCU):
-            with cols[i % 2]:
-                
-                #affichage films
-                st.markdown(f"**{movie}**")
-                st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            width=400 )
-                
-                st.markdown("---")
 #----------------------------------------- Page profil -----------------------------------------------------------    
 
 def page_profil() : 
@@ -1061,9 +1292,6 @@ if "username" not in st.session_state:
 if "is_new_user" not in st.session_state:
     st.session_state["is_new_user"] = False
     
-        # url api google sheets
-        
-SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQaRK6AYD4zCtkn8DvHO6mO4E7GJiG5x9YOh_C1nt7U59eZCREsGFyFnOmewMmd2g5aA/exec"
 
         # Donnees des comptes
 # --- 1. Fonction de Chargement et de Formatage des Données ---
