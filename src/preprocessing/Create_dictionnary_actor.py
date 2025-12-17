@@ -2,8 +2,8 @@ import pandas as pd
 import duckdb
 import os
 
-path_v2 = os.path.join('data', 'processed', 'dataframe_v2.csv')
-path_v3 = os.path.join('data', 'processed', 'dataframe_v3.csv')
+path_v2 = os.path.join('data', 'processed', 'dataframe_v2.pkl')
+path_v3 = os.path.join('data', 'processed', 'dataframe_v3.pkl')
 
 conn = duckdb.connect()
 
@@ -24,7 +24,7 @@ print('dictionnary created')
 print(dict_id_name['nm0000206'])  
 
 #import dataframe_v2
-dataframe_v2 = pd.read_csv(path_v2)
+dataframe_v2 = pd.read_pickle(path_v2)
 print('dataframe_v2 imported')
 
 #transform actor id to actor name in dataframe_v2
@@ -45,7 +45,7 @@ for col in colonnes :
 print('actor id transformed to actor name in dataframe_v2')
 
 #export new dataframe_v3
-dataframe_v2.to_csv(path_v3, index = False)
+dataframe_v2.to_pickle(path_v3)
 print('dataframe_v3 exported')
 
 # End of the script

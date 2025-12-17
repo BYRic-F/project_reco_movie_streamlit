@@ -2,12 +2,14 @@
 import pandas as pd
 from surprise import Dataset, Reader
 from surprise.model_selection import train_test_split
-from surprise import SVDpp ,SVD
+from surprise import SVD
 from surprise.model_selection import cross_validate
 from surprise import accuracy
 from surprise.model_selection import GridSearchCV
 import os
 import joblib
+
+
 
 path_movielens_ratings = os.path.join('data', 'raw', 'ratings.csv')
 path_links= os.path.join('data', 'raw', 'links.csv')

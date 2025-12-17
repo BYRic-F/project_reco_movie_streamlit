@@ -38,4 +38,4 @@ print(f" le df steamlit a {df_final.shape[0]} lignes")
 
 print(f" verif nombre de valeurs nulles sur title_final {df_final['title_final'].isnull().sum()}")
 
-df_final.to_parquet('data/processed/dataframe_streamlit.parquet')
+df_final.to_pickle('data/processed/dataframe_streamlit.pkl')

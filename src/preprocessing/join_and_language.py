@@ -1,11 +1,11 @@
 import os
 import pandas as pd
-path_v3 = os.path.join('data', 'processed', 'dataframe_v3.csv')
-output_path = os.path.join('data', 'processed', 'dataframe_v4.csv')
+path_v3 = os.path.join('data', 'processed', 'dataframe_v3.pkl')
+output_path = os.path.join('data', 'processed', 'dataframe_v4.pkl')
 path_tmdb = os.path.join('data', 'raw', 'tmdb_full.csv')
 
 #import dataframe v3
-dataframe_v3 = pd.read_csv(path_v3)
+dataframe_v3 = pd.read_pickle(path_v3)
 dataframe_v3.head()
 
 
@@ -143,6 +143,6 @@ print(df_filtre.head(5).to_markdown())
 
 # Export du fichier v 4
 
-df_filtre.to_csv(output_path, index=False)
+df_filtre.to_pickle(output_path)
 
 

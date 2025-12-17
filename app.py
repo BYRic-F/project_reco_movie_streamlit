@@ -1,5 +1,5 @@
 # import des librairies
-
+from surprise import Dataset, Reader
 import streamlit as st
 from streamlit_authenticator import Authenticate, Hasher
 from streamlit_option_menu import option_menu
@@ -8,7 +8,11 @@ import json
 import pandas as pd
 import os
 import joblib
+import numpy as np
+import altair as alt
+import random
 
+API_KEY = "99dea9a9dd2b4d7d7f47e9a0cdd160f7"
 
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
@@ -22,13 +26,13 @@ with open("style.css") as f:
 # definition de quelques listes :
 # liste de films les plus populaires et variés pour créer les préférences des utilisateurs
 csv_path = os.path.join("data", "processed", "movies_db.csv")
-dataframe_path = os.path.join("data", "processed", 'dataframe_streamlit.parquet')
+dataframe_path = os.path.join("data", "processed", 'dataframe_streamlit.pkl')
 
 #Chargement des bases de données
 @st.cache_data(show_spinner="Chargement du catalogue films...")
 def load_dataframe_streamlit(path):
     """Charge et met en cache le DataFrame principal (parquet)."""
-    return pd.read_parquet(path)
+    return pd.read_pickle(path)
 
 @st.cache_data(show_spinner="Chargement de la base de données de notation...")
 def load_movies_db(path):
@@ -51,15 +55,76 @@ def load_knn_pipeline(path):
     """Charge le pipeline KNN une seule fois et le met en cache."""
     pipeline = joblib.load(path)
     return pipeline
-ML_FEATURES = ['genres_clean','directors_clean','actor_actress_clean','NLP',  'startYear','averageRating','numVotes']
+ML_FEATURES = ['genres_clean','directors_clean','actor_actress_clean','NLP',  'startYear','averageRating','numVotes','production_companies_name_clean']
 # Appeler la fonction mise en cache pour charger le pipeline
 pipeline_knn = load_knn_pipeline(path_pipeline)
 df_knn = pd.read_pickle(path_df_ml)
 
+# --- Chargement du modèle et des foncitons SVD ---
+path_svd = os.path.join('model', 'model_svd.joblib')
 
+@st.cache_resource 
+def load_svd_model(path):
+    return joblib.load(path)
 
+model_svd = load_svd_model(path_svd)
+
+#-----------------------------  Creation fonction svd : récupérer note + pred ------------------------------
+
+# le svd model ne marchait pas sur des utilisateurs qui n'etait pas dans la BDD d'entrainement, on utilise donc un vecteur qui aime ce film, aime aussi ce film
+def generer_reco_via_qi(model_svd, ratings_dict):
+    """
+    Génère des recommandations basées sur les vecteurs latents (QI).
+    Récupère le Top 100 pour permettre le filtrage des films déjà vus ensuite.
+    """
+    # On récupere les matrices d'entrainement de notre svd (carte complete des films)
+    matrice_items = model_svd.qi
+    n_factors = matrice_items.shape[1]
+    
+    # vecteur user nul
+    user_vector = np.zeros(n_factors)
+    count = 0
+    
+    # Construction profil user
+    # ratings_dict, films notés sur Sheets
+    for movie_id, rating in ratings_dict.items():
+        try:
+            # Conversion ID externe (TMDB) -> ID interne (Surprise)
+            # On force int() car les clés JSON arrivent souvent en string
+            iid = model_svd.trainset.to_inner_iid(int(movie_id))
+            # Pondération : On donne plus d'importance aux films bien notés
+            poids = float(rating) / 5.0
+            # Ajout au vecteur utilisateur
+            user_vector += matrice_items[iid] * poids
+            count += 1
+        except (ValueError, KeyError):
+            # Cas où le film noté n'est pas dans le dataset d'entraînement
+            continue
+            
+    # Normalisation car sinon plus on noterait plus le vecteur serait long = distance faussée
+    user_vector = user_vector / count
+    # le vecteur user est calculé, on va chercher les films qui s'alignent
+    # Calcul de similarité 
+    # Cela génère un score de pertinence pour chaque film .dot permet de comparer le vecteur au 10000 vecteurs
+    scores = np.dot(matrice_items, user_vector)
+    
+    # On récupère les plus grands indices
+    # argsort trie du plus petit au plus grand, [::-1] inverse pour avoir le décroissant
+    # 100 meilleurs, le random est plus pertinent
+    top_indices = np.argsort(scores)[::-1][:100]
+    
+    # 7. Convertir les IDs internes (Surprise) en IDs réels (TMDB) comme le modele retient des index, ca permet de retourner en arriere
+    #et trouver le bon tmdbid avec l'index
+    reco_ids = []
+    for iid in top_indices:
+        try:
+            raw_id = model_svd.trainset.to_raw_iid(iid)
+            reco_ids.append(raw_id)
+        except:
+            pass
+            
+    return reco_ids
 #----------------------------------------
-
 
 BASE_URL = "https://image.tmdb.org/t/p/w500"
 
@@ -70,6 +135,16 @@ ALL_DOC_GENRES = [
     "Affaires Criminelles","Sport","Musique et Art","Alimentation et Cuisine","Guerre et Conflit"]
 
 
+
+#----------------------------------------Creation fonction Api--------------------------------- 
+
+# Fonction pour récupérer les détails d'un film par ID
+def obtenir_details_film(film_id):
+    details_url = f"https://api.themoviedb.org/3/movie/{film_id}?api_key={API_KEY}&language=fr-FR"
+    return requests.get(details_url).json()
+def obtenir_cast(film_id):
+    credits_url = f"https://api.themoviedb.org/3/movie/{film_id}/credits?api_key={API_KEY}&language=fr-FR"
+    return requests.get(credits_url).json().get("cast", [])
 #------------------------------- Creation des fonctions des differentes pages ---------------------------------------------------------------
 #
 #--------------------------------- page config new user--------------------------------------------------------
@@ -201,8 +276,78 @@ def page_new_user1():
 
             except Exception as e:
                 st.error(f"Erreur de connexion : {e}")
-            
+  #--------------------------- Def verifier films a noter--------          
+@st.dialog("🍿 C'est l'heure du verdict !")
+def afficher_notations_popup(pending_ids, username):
+    st.write(f"Vous avez **{len(pending_ids)} film(s)** en attente de note.")
+    
+    # On affiche le premier film de la liste
+    for f_id in pending_ids[:1]: 
+        details = obtenir_details_film(f_id)
+        
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            poster = details.get("poster_path")
+            if poster:
+                st.image(f"https://image.tmdb.org/t/p/w200{poster}", width='stretch')
+        with col2:
+            st.subheader(details.get('title'))
+            # Slider
+            note = st.feedback("stars", key=f"slider_pop_{f_id}")
+        
+        # Bouton Valider
+        if st.button("Valider la note", key=f"btn_pop_{f_id}", width='stretch'):
+            if note is None:
+                st.warning("Veuillez sélectionner au moins une étoile ⭐")
+            else :
+                with st.spinner("Enregistrement..."):
+                    try:
+                        clean_id = str(int(float(f_id)))
+                        note_reelle = note + 1
+                        payload = {
+                            "action": "submit_ratings",
+                            "username": username,
+                            "ratings": {clean_id: int(note_reelle)}
+                        }
+                        requests.post(SHEETS_API_URL, json=payload)
+                        st.toast("C'est enregistré !")
+                        st.rerun() 
+                    except Exception as e:
+                        st.error(f"Erreur : {e}")
 
+
+#FOnciton appel
+def verifier_films_a_noter():
+    # Sécurité connexion
+    if not st.session_state.get("authentication_status"):
+        return
+
+    username = st.session_state['username']
+    
+    # Récupération API
+    try:
+        url = f"{SHEETS_API_URL}?action=get_pending_movies&username={username}"
+        response = requests.get(url)
+        pending_ids = response.json() 
+    except:
+        pending_ids = []
+
+    # Si des films sont trouvés
+    if pending_ids:
+        # On affiche un BANDEAU D'ALERTE joli et stable
+        # st.warning crée un fond jaune/orange qui attire l'oeil
+        with st.container(border=True):
+            col_msg, col_btn = st.columns([3, 1])
+            
+            with col_msg:
+                st.info(f"🔔 **Hey {st.session_state.get('name')} !** Vous avez **{len(pending_ids)} film(s)** vus récemment à noter.")
+            
+            with col_btn:
+                # C'est ce bouton qui déclenche la modale
+                st.markdown("<div style='height: 2px;'></div>", unsafe_allow_html=True)
+                if st.button("⭐ Noter maintenant", width='stretch'):
+                    afficher_notations_popup(pending_ids, username)
+                                                                                                                                        
 # ------------------fonction SIDE BAR-----------------------------
 def sidebar(authenticator):
     with st.sidebar :
@@ -286,13 +431,58 @@ def page_accueil() :
         * **Autres Origines Diversifiées :** Nous incluons également des œuvres significatives produites au **Japon**, aux **Pays-Bas**, au **Portugal**, en **Irlande** et en **Finlande**.
         """)
         
-    #---Docu
-    with st.expander("🌍 Documentaires incontournables"):
+    #---Docu--------------------------------------
+    with st.expander("📚 Documentaires incontournables"):
         st.markdown("""
         Notre sélection rassemble le meilleur du cinéma documentaire. :
         
         * Élargissez vos horizons avec notre sélection de documentaires triés sur le volet. Nous vous proposons des œuvres **de haute qualité** et des histoires puissantes pour satisfaire votre curiosité et approfondir votre compréhension du monde.
         """)
+        #--------------------- NOtre BDD-------------------------------------------
+    with st.expander("📖 Notre base de données"):
+        total_films_B = df_streamlit['title_final'].nunique()
+        total_pays = df_streamlit['original_language'].nunique()
+
+        st.write("### Quelques infos sur nos films...")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                label="Nombre total de films uniques",
+                value=f"{total_films_B:,}".replace(",", " "))
+        with col2:
+            st.metric(
+                label="Nombre d'acteurs et d'actrices",
+                value=f"{len(df_streamlit.explode('actor_actress')):,}".replace(",", " "))
+        with col3:
+            st.metric(
+                label="Nombre de pays de production",
+                value=f"{total_pays:,}".replace(",", " "))
+        def plot_genre_counts_adapted(dataframe):
+
+    # Explosion
+            df_exploded = dataframe.explode('genres')
+            #  Compter la fréquence de chaque genre
+            genre_counts = df_exploded['genres'].value_counts().reset_index()
+            genre_counts.columns = ['Genre', 'Nombre de Films']
+            return genre_counts
+
+        genre_counts_df = plot_genre_counts_adapted(df_streamlit)
+        st.header("Distribution des films par catégorie")
+
+        # 1. Création du graphique Altair avec rotation
+        chart = alt.Chart(genre_counts_df).mark_bar().encode(
+            x=alt.X('Genre',axis=alt.Axis(labelOverlap=False,labelAngle=45),sort='-y'),
+            y='Nombre de Films',
+            tooltip=['Genre', 'Nombre de Films']
+        ).properties(
+            title='Nombre Total de Films par Genre'
+        ).interactive()
+
+        # 2. Affichage du graphique Altair dans Streamlit
+        st.altair_chart(chart, use_container_width=True)
+        st.markdown(f"**Nombre total de genres uniques :** {len(genre_counts_df)}")
+        st.dataframe(genre_counts_df)
+
 
     st.markdown("---")
     
@@ -316,7 +506,6 @@ def page_film() :
     # Ajout des options disponibles aux utilisateurs enregistrés
     if st.session_state["authentication_status"] is True:
         radio_choix.append("Surprends moi !")
-    
     header_col1, header_col2, header_col3 = st.columns([4, 6, 1])
     with header_col2:
         st.header("🎥 Recherche de films 🎥")
@@ -327,21 +516,15 @@ def page_film() :
         choix_filtres = st.radio("",
         (radio_choix
         ))
+    if choix_filtres != "Surprends moi !" and 'film_surprise_actuel' in st.session_state:
+        del st.session_state['film_surprise_actuel']
     # Recherche par titre
     search_col1, search_col2, search_col3 = st.columns(3)   
     if choix_filtres == "Recherche par titre":
         all_titles = sorted(df_streamlit['title_final'].dropna().astype(str).str.strip().unique(),key=str.lower)
-        #all_titles = sorted(df_streamlit['title_final'].unique().tolist())
-        #with search_col1 :
-            #film_write = st.selectbox(
-                #label="Entrez le titre du film que vous recherchez :",
-                #options=['-- Sélectionner un film --'] + all_titles, 
-                #index=0, 
-                #key="autocomplete_movie_select")
-                #key="autocomplete_movie_select")
         with radio_col2 :
             st.markdown("<div style='height:85px'></div>",unsafe_allow_html=True)
-            query = st.text_input(label ="Entrez le titre du film")
+            query = st.text_input(label ="Entrez le titre du film")           
             film_write = None
             if query:
                 q = query.lower()
@@ -364,10 +547,40 @@ def page_film() :
                 submit_titre = st.button("Lancer la recherche") 
         
     # Creation des filtres de recherche( genre, année, pays de production , acteurs, realisateurs, durée)
+    genres_traduits = {
+    "Action": "Action",
+    "Adult": "Adulte",
+    "Adventure": "Aventure",
+    "Animation": "Animation",
+    "Biography": "Biographie",
+    "Comedy": "Comédie",
+    "Crime": "Crime",
+    "Documentary": "Documentaire",
+    "Drama": "Drame",
+    "Family": "Famille",
+    "Fantasy": "Fantastique",
+    "History": "Histoire",
+    "Horror": "Horreur",
+    "Music": "Musique",
+    "Musical": "Comédie musicale",
+    "Mystery": "Mystère",
+    "News": "Actualités",
+    "Romance": "Romance",
+    "Sci-Fi": "Science-fiction",
+    "Sport": "Sport",
+    "Thriller": "Thriller",
+    "War": "Guerre",
+    "Western": "Western"
+}
     if choix_filtres == "Recherche par filtres" :
         filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
-        with filtre_col1 :    
-            genre = st.selectbox("Genre", df_streamlit['genres'].explode().unique())
+        with filtre_col1:
+    # affiche en fr
+            choix_fr = st.selectbox("Genre", sorted(genres_traduits.values()))
+    
+    # On recup en ang pour pas causer d'erreurs dans le df
+            genre_anglais = [ang for ang, fr in genres_traduits.items() if fr == choix_fr][0]
+            
             actor = st.selectbox("Acteurs", df_streamlit['actor_actress'].explode().unique())
         with filtre_col2 :
             annee = st.selectbox("Année de sortie", df_streamlit['startYear'].unique())
@@ -387,37 +600,78 @@ def page_film() :
             col_but1, colbut2, colbut3 = st.columns([3,6,1])
             with colbut2 :
                 submit_surprise = st.button("Nouveau film surprise")
-    #gère erreur si pas de film
-    #if submit_titre == '-- Sélectionner un film --':
-        #st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
     st.markdown("---")
     
     #si on clique sur recherche par titre ATTENTION IL FAUDRA INTEGRE CONDITIONS FILTRES AUSSI
-    if submit_titre and film_write : # and film_write != '-- Sélectionner un film --': 
+    if submit_titre and film_write:
+        # 1. CALCUL KNN
         index = df_streamlit[df_streamlit['title_final'].str.lower() == film_write.strip().lower()].index[0]
         movie_data_for_ml = df_knn.iloc[[index]][ML_FEATURES]
-        distances, indices = pipeline_knn[1].kneighbors(
-                pipeline_knn[0].transform(movie_data_for_ml))
-        recommended_indices = indices[0][1:5] 
-        recommended_df = df_streamlit.iloc[recommended_indices]
-        st.write(recommended_df)
-                #Boucle pour affichage
-        COLUMNS_PER_ROW = 4
-        cols = st.columns(COLUMNS_PER_ROW)
-        LISTE_test = ['Plop', 'Babar', 'Jm', "lalal"]
-        for i, movie in enumerate(LISTE_test):
-            with cols[i % 4]:
+        distances, indices = pipeline_knn[1].kneighbors(pipeline_knn[0].transform(movie_data_for_ml))
+        
+        # On récupère les 4 films les plus proches (index 1 à 4)
+        reco_df = df_streamlit.iloc[indices[0][1:5]]
+
+        st.markdown(f"### 🎯 Films recommandés pour : {film_write}")
+        st.markdown("---")
+
+        # boucle pour afficher
+        for i, (idx, row) in enumerate(reco_df.iterrows()):
+            # Utilisation de l'ID TMDB présent dans le pickle
+            f_id = row['id']
+            
+            # appel fonctions api
+            details = obtenir_details_film(f_id)
+            
+            if details and "id" in details:
+                # Récupération du cast et crew
+                credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
+                credits = requests.get(credits_url).json()
                 
-                #affichage films
-                st.markdown(f"**{movie}**")
-                st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            width='stretch' )
+                # Extraction des infos
+                annee = details.get('release_date', '????')[:4]
+                genres = ", ".join([g['name'] for g in details.get('genres', [])])
+                directors = [m["name"] for m in credits.get("crew", []) if m["job"] == "Director"]
+                cast = [a["name"] for a in credits.get("cast", [])[:5]]
                 
-                st.markdown("---")
-        #erreur si aucun film entrer
-    if submit_titre and film_write == '-- Sélectionner un film --':           
-        st.error("Attention : **Entrez le nom d'un film pour lancer la recherche.**")
-    
+                # Mise en page
+                col1, col2 = st.columns([1, 3]) 
+                
+                with col1:
+                    poster = details.get("poster_path")
+                    if poster:
+                        st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
+                
+                with col2:
+                    col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
+                    with col2mov:
+                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                        st.subheader(f"{i+1}. {details.get('title')}")
+                        
+                        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+                        st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres}")
+                        st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
+                        st.write(f"👥 **Acteurs :** {', '.join(cast)}")
+                        
+                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
+                        # Gestion du résumé car certaion apparaissent pas
+                        resume = details.get('overview')
+                        is_english = False
+
+                        if not resume or resume.strip() == "":
+                            details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
+                            resume = details_en.get('overview', 'Aucun résumé disponible.')
+                            is_english = True
+
+                        if is_english:
+                            st.caption("🇬🇧 *Résumé uniquement disponible en anglais*")
+                        
+                        st.write(f"📖 **Résumé :** {resume}")
+
+            st.markdown("---")
+
+
     #si on clique sur recherche par filtre
     
     if submit_filtre :
@@ -425,20 +679,169 @@ def page_film() :
         st.write(df_streamlit[df_streamlit['startYear']== annee])
     
     #si on clique sur surprends moi 
-    if submit_surprise : 
-                #Boucle pour affichage
-        COLUMNS_PER_ROW = 4
-        cols = st.columns(COLUMNS_PER_ROW)
-        LISTE_test = ['Plop', 'Babar', 'Jm', "lalal"]
-        for i, movie in enumerate(LISTE_test):
-            with cols[i % 4]:
-                
-                #affichage films
-                st.markdown(f"**{movie}**")
-                st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            use_container_width=True )
-                
-                st.markdown("---")
+# ... dans la section "Surprends moi !" de page_film ...
+
+    # 1 on calcule quand on clique sur le bouton
+    if submit_surprise:
+        if model_svd is None:
+            st.error("Modèle SVD non chargé.")
+        else:
+            with st.spinner("Récupération de vos notes..."):
+                try:
+                    # Appel API
+                    username = st.session_state['username']
+                    url_api = f"{SHEETS_API_URL}?action=get_user_ratings&username={username}"
+                    response = requests.get(url_api)
+                    response.raise_for_status()
+                    user_real_ratings = response.json()
+                except Exception as e:
+                    st.error(f"Erreur API : {e}")
+                    user_real_ratings = {}
+
+                # Calcul SVD
+                if user_real_ratings:
+                    reco_ids = generer_reco_via_qi(model_svd, user_real_ratings)
+                    
+                    if reco_ids:
+                        # Filtrage car les notes revenaient sous forme de float et n'etaitjamais pareil
+                        def nettoyer_id(val):
+                            try: return str(int(float(val)))
+                            except: return str(val).strip()
+                        #Pour eviter les doublons daja vus
+                        ids_deja_vus_propres = set(nettoyer_id(k) for k in user_real_ratings.keys())
+                        reco_ids_new = []
+                        for rid in reco_ids:
+                            rid_clean = nettoyer_id(rid)
+                            if rid_clean not in ids_deja_vus_propres:
+                                reco_ids_new.append(rid)
+                        
+                        if not reco_ids_new: reco_ids_new = reco_ids 
+
+                        # Sauvegarde du choix en memoire
+                        # Random pour pas toujours afficher les meme
+                        film_choisi = random.choice(reco_ids_new)
+                        st.session_state['film_surprise_actuel'] = film_choisi
+                        st.session_state['nb_notes_user'] = len(user_real_ratings) # Juste pour l'info
+                        
+                    else:
+                        st.warning("Aucune correspondance trouvée.")
+                else:
+                    st.error("Impossible de récupérer vos notes.")
+
+    # condition si un film est affiché
+    if 'film_surprise_actuel' in st.session_state :
+        
+        # On récupère l'ID stocké
+        f_id = st.session_state['film_surprise_actuel']
+        nb_notes = st.session_state.get('nb_notes_user', '?')
+
+        # On récupère les détails (API TMDB)
+        details = obtenir_details_film(f_id)
+        
+        if details and "id" in details:
+            if submit_surprise: 
+                st.balloons()
+            
+            st.success(f"✨ Basé sur vos {nb_notes} films notés !")
+
+            # Récupération Crédits
+            credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
+            try: credits_data = requests.get(credits_url).json()
+            except: credits_data = {}
+
+            # Variables d'affichage
+            i = 0
+            annee = details.get('release_date', '????')[:4]
+            genres = ", ".join([g['name'] for g in details.get('genres', [])])
+            directors = [m["name"] for m in credits_data.get("crew", []) if m["job"] == "Director"]
+            cast = [a["name"] for a in credits_data.get("cast", [])[:5]]
+
+            # --- MISE EN PAGE ---
+            col1, col2 = st.columns([1, 3]) 
+            with col1:
+                poster = details.get("poster_path")
+                if poster:
+                    st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
+            
+            with col2:
+                col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
+                with col2mov:
+                    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    st.subheader(f"{i+1}. {details.get('title')}")
+                    
+                    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+                    st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres}")
+                    st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
+                    st.write(f"👥 **Acteurs :** {', '.join(cast)}")
+                    
+                    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
+                    # Résumé
+                    resume = details.get('overview')
+                    if not resume or resume.strip() == "":
+                        try:
+                            details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
+                            resume = details_en.get('overview', 'Aucun résumé disponible.')
+                            st.caption("🇬🇧 *Résumé en anglais*")
+                        except: resume = "Pas de résumé."
+                    
+                    st.write(f"📖 **Résumé :** {resume}")
+                    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                    st.success("🎯 **Améliorez vos résultats :** Cliquez sur 'Je regarde ce film' pour que l'algorithme comprenne ce que vous aimez !")
+
+                    # --- LE BOUTON "JE REGARDE"  et envoie de la requete a la sheets
+                    if st.session_state.get("authentication_status") is True:
+                        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                        
+                        # Création de deux colonnes pour aligner les boutons
+                        col_btn_watch, col_btn_seen = st.columns(2)
+                        
+                        # COLONNE 1 : BOUTON WATCHLIST
+                        with col_btn_watch:
+                            if st.button("🍿 Je regarde !", key=f"btn_watch_{f_id}", use_container_width=True):
+                                with st.spinner("Ajout à votre historique..."):
+                                    try:
+                                        payload = {
+                                            "action": "add_watchlist",
+                                            "username": st.session_state['username'],
+                                            "movie_id": str(int(float(f_id)))
+                                        }
+                                        requests.post(SHEETS_API_URL, json=payload)
+                                        st.toast("Ajouté à votre liste 'À voir' !", icon="✅")
+                                    except Exception as e:
+                                        st.error(f"Erreur connexion : {e}")
+
+                        # COLONNE 2 : BOUTON DEJA VU + NOTATION
+                        with col_btn_seen:
+                            # petit popover
+                            with st.popover("✅ J'ai déjà vu", width='stretch'):
+                                st.markdown(f"**Notez :** {details.get('title')}")
+                                
+                                # Les étoiles (0-4 par défaut, donc on ajoutera +1)
+                                rating_val = st.feedback("stars", key=f"feed_rate_{f_id}")
+                                
+                                if st.button("Valider la note", key=f"btn_send_rate_{f_id}", type="primary"):
+                                    if rating_val is not None:
+                                        final_score = rating_val + 1  # vonversion 0-4 vers 1-5
+                                        
+                                        with st.spinner("Envoi..."):
+                                            try:
+                                                payload_rate = {
+                                                    "action": "submit_ratings",
+                                                    "username": st.session_state['username'],
+                                                    "ratings": {str(int(float(f_id))): final_score}
+                                                }
+                                                res = requests.post(SHEETS_API_URL, json=payload_rate)
+                                                if res.status_code == 200:
+                                                    st.toast(f"Note de {final_score}/5 enregistrée !")
+                                                else:
+                                                    st.error("Erreur API")
+                                            except Exception as e:
+                                                st.error(f"Erreur : {e}")
+                                    else:
+                                        st.warning("Veuillez sélectionner au moins une étoile.")
+            st.markdown("---")
+        
 #----------------------------------------fonciton Page_docu-------------------------------------
 
     
@@ -759,7 +1162,7 @@ if st.session_state["authentication_status"] is True or st.session_state["is_gue
     
     else :
         page_selection = sidebar(authenticator)
-        
+        verifier_films_a_noter()
     # affichage des pages selon le choix de la sidebar
         
         if page_selection == "Accueil":

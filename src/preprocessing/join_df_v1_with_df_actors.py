@@ -3,7 +3,7 @@ import os
 
 path_parquet = os.path.join('data', 'raw', 'actors_producers_pivot.parquet')
 path_csv_base = os.path.join('data', 'processed', 'dataframe_v1.csv')
-path_output = os.path.join('data', 'processed', 'dataframe_v2.csv')
+path_output = os.path.join('data', 'processed', 'dataframe_v2.pkl')
 
 actors_producers = pd.read_parquet(path_parquet)
 print(actors_producers.head(5))
@@ -16,4 +16,4 @@ dataframe_finale = pd.merge(dataframe_base, actors_producers, how='left', on='tc
 print(dataframe_finale.head(5))
 print(dataframe_finale.shape)
 
-dataframe_finale.to_csv(path_output, index=False)
+dataframe_finale.to_pickle(path_output)

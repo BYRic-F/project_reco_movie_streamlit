@@ -26,6 +26,7 @@ cols_knn = [
     'genres_clean',
     'directors_clean',
     'actor_actress_clean',
+    'production_companies_name_clean',
     'NLP',  
 
     # num
@@ -49,7 +50,7 @@ preprocessor = ColumnTransformer(
             # Text
         ('genres', Pipeline([
             ("tfifd", TfidfVectorizer()),
-            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 2.2}))
+            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 0.5}))
             ]), 'genres_clean'),
         
         ('directors', Pipeline([
@@ -60,23 +61,39 @@ preprocessor = ColumnTransformer(
         
         ('actors', Pipeline([
             ("tfifd", TfidfVectorizer(min_df=3)),
-            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 2}))
+            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 1.2}))
             ]), 'actor_actress_clean'),
         
+        ('prod_comp', Pipeline([
+            ("tfidf", TfidfVectorizer(min_df=2)),
+            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 1.0}))
+            ]), 'production_companies_name_clean'),
 
         ('NLP', Pipeline([
-            ("tfifd", TfidfVectorizer(min_df=5, max_features=5000, ngram_range=(1,2))),
-            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 1.5}))
+            ("tfifd", TfidfVectorizer(min_df=5, max_features=10000, ngram_range=(1,2))),
+            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 2}))
             ]),'NLP'),
+        
+        ('year', Pipeline([
+            ('scaler', MinMaxScaler()),
+            ('weight', FunctionTransformer(weight_features, kw_args={'weight': 0.4}))
+            ]), ['startYear']),
+
+        ('stats', Pipeline([
+            ('scaler', MinMaxScaler()),
+            ('weight', FunctionTransformer(weight_features, kw_args={'weight': 0.1})) 
+            ]), ['averageRating', 'numVotes'])
+    ],
+)
         
         
         # Chiffres
-        ('num', Pipeline([
-            ('scaler', MinMaxScaler()),
-            ('weight', FunctionTransformer(weight_features, kw_args={'weight': 1.5}))
-            ]), ['startYear', 'averageRating', 'numVotes'])
-    ],
-)
+        #('num', Pipeline([
+            #('scaler', MinMaxScaler()),
+            #('weight', FunctionTransformer(weight_features, kw_args={'weight': 1.5}))
+            #]), ['startYear', 'averageRating', 'numVotes'])
+    #],
+#)
 
 print(preprocessor)
 
