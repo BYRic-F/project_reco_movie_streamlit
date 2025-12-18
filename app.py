@@ -1191,10 +1191,11 @@ def page_docu():
             nb = len(resultats_docu)
             
             # Message de debug pour savoir combien de films sont trouvés
-            st.success(f"{nb} films trouvés (Affichage des 20 premiers)")
+            st.success(f"{nb} documentaires trouvés (Affichage des 20 premiers)")
 
             # IMPORTANT : On coupe le tableau pour ne garder que les 20 premiers
-            films_affi = resultats_docu.sample(20)
+            nb_max = min(len(resultats_docu), 20)
+            films_affi = resultats_docu.sample(n=nb_max)
             
             # On boucle sur la version coupée (films_affi) et non pas sur tout le tableau
             for i, (idx, row) in enumerate(films_affi.iterrows()):
