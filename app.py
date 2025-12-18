@@ -12,9 +12,11 @@ import numpy as np
 import altair as alt
 import random
 
-API_KEY = "99dea9a9dd2b4d7d7f47e9a0cdd160f7"
+# cle api et secrets
+# On récupère les clés depuis les secrets (fonctionne en Local ET sur le Cloud)
+API_KEY = st.secrets["tmdb_api_key"]
+SHEETS_API_URL = st.secrets["sheets_api_url"]
 
-SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQaRK6AYD4zCtkn8DvHO6mO4E7GJiG5x9YOh_C1nt7U59eZCREsGFyFnOmewMmd2g5aA/exec"
 
 # Configuration de la page Streamlit
 st.set_page_config(layout="wide",
@@ -523,7 +525,7 @@ def page_accueil() :
             df_exploded = dataframe.explode('genres')
             #  Compter la fréquence de chaque genre
             genre_counts = df_exploded['genres'].value_counts().reset_index()
-            genre_counts.columns = ['Genre', 'Nombre de Films']
+            genre_counts.columns = ['Genre', 'Nombre de films']
             return genre_counts
 
         genre_counts_df = plot_genre_counts_adapted(df_streamlit)
@@ -532,10 +534,10 @@ def page_accueil() :
         # 1. Création du graphique Altair avec rotation
         chart = alt.Chart(genre_counts_df).mark_bar().encode(
             x=alt.X('Genre',axis=alt.Axis(labelOverlap=False,labelAngle=45),sort='-y'),
-            y='Nombre de Films',
-            tooltip=['Genre', 'Nombre de Films']
+            y='Nombre de films',
+            tooltip=['Genre', 'Nombre de films']
         ).properties(
-            title='Nombre Total de Films par Genre'
+            title='Nombre total de films par genre'
         ).interactive()
 
         # 2. Affichage du graphique Altair dans Streamlit
