@@ -35,7 +35,7 @@ dataframe_path = os.path.join("data", "processed", 'dataframe_streamlit.pkl')
 #Chargement des bases de données
 @st.cache_data(show_spinner="Chargement du catalogue films...")
 def load_dataframe_streamlit(path):
-    """Charge et met en cache le DataFrame principal (parquet)."""
+    """Charge et met en cache le DataFrame principal (parquepickle)."""
     return pd.read_pickle(path)
 
 @st.cache_data(show_spinner="Chargement de la base de données de notation...")
@@ -501,50 +501,55 @@ def page_accueil() :
         * Élargissez vos horizons avec notre sélection de documentaires triés sur le volet. Nous vous proposons des œuvres **de haute qualité** et des histoires puissantes pour satisfaire votre curiosité et approfondir votre compréhension du monde.
         """)
         #--------------------- NOtre BDD-------------------------------------------
-    with st.expander("📖 Notre base de données"):
-        total_films_B = df_streamlit['title_final'].nunique()
+    with st.expander("📖 Statistiques de la base", expanded=True):
+        st.write("### Coup d'œil sur le catalogue")
+        
+        # Métriques
+        c1, c2, c3 = st.columns(3)
+        total_films = df_streamlit['title_final'].nunique()
+        nb_acteurs = len(df_streamlit.explode('actor_actress'))
         total_pays = df_streamlit['original_language'].nunique()
+        
+        c1.metric("Films", f"{total_films:,}".replace(",", " "))
+        c2.metric("Acteurs/Actrices", f"{nb_acteurs:,}".replace(",", " "))
+        c3.metric("Pays", f"{total_pays:,}".replace(",", " "))
 
-        st.write("### Quelques infos sur nos films...")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(
-                label="Nombre total de films uniques",
-                value=f"{total_films_B:,}".replace(",", " "))
-        with col2:
-            st.metric(
-                label="Nombre d'acteurs et d'actrices",
-                value=f"{len(df_streamlit.explode('actor_actress')):,}".replace(",", " "))
-        with col3:
-            st.metric(
-                label="Nombre de pays de production",
-                value=f"{total_pays:,}".replace(",", " "))
-        def plot_genre_counts_adapted(dataframe):
+        st.markdown("---")
+        
+        # --- GRAPHIQUES 
+        
+        graph_col1, graph_col2 = st.columns(2, gap="medium")
 
-    # Explosion
-            df_exploded = dataframe.explode('genres')
-            #  Compter la fréquence de chaque genre
+        with graph_col1:
+            st.subheader("Par Genre")
+            # Préparation des données Genres
+            df_exploded = df_streamlit.explode('genres')
             genre_counts = df_exploded['genres'].value_counts().reset_index()
-            genre_counts.columns = ['Genre', 'Nombre de films']
-            return genre_counts
+            genre_counts.columns = ['Genre', 'Count']
+            
+            # Chart Altair
+            chart_genres = alt.Chart(genre_counts).mark_bar(color='#E10600').encode(
+                x=alt.X('Genre', sort='-y', title=None),
+                y=alt.Y('Count', title='Nb de films'),
+                tooltip=['Genre', 'Count']
+            ).properties(
+                height=300 # Hauteur fixe
+            ).interactive()
+            
+            st.altair_chart(chart_genres, use_container_width=True)
 
-        genre_counts_df = plot_genre_counts_adapted(df_streamlit)
-        st.header("Distribution des films par catégorie")
-
-        # 1. Création du graphique Altair avec rotation
-        chart = alt.Chart(genre_counts_df).mark_bar().encode(
-            x=alt.X('Genre',axis=alt.Axis(labelOverlap=False,labelAngle=45),sort='-y'),
-            y='Nombre de films',
-            tooltip=['Genre', 'Nombre de films']
-        ).properties(
-            title='Nombre total de films par genre'
-        ).interactive()
-
-        # 2. Affichage du graphique Altair dans Streamlit
-        st.altair_chart(chart, use_container_width=True)
-        st.markdown(f"**Nombre total de genres uniques :** {len(genre_counts_df)}")
-        st.dataframe(genre_counts_df)
-
+            with graph_col2:
+                st.subheader("Répartition des notes")
+                chart_ratings = alt.Chart(df_knn).mark_bar(color='#E10600').encode(
+                    x=alt.X('averageRating', bin=alt.Bin(maxbins=30), title='Note moyenne (Intervalle)'),
+                    y=alt.Y('count()', title='Nombre de films'),
+                    # Tooltip adapté pour afficher l'intervalle et le compte
+                    tooltip=[alt.Tooltip('averageRating', bin=True, title='Note approx.'), 'count()']
+                ).properties(
+                    height=300
+                ).interactive()
+                
+                st.altair_chart(chart_ratings, use_container_width=True)
 
     st.markdown("---")
     
