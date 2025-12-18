@@ -152,12 +152,24 @@ def generer_reco_via_qi(model_svd, ratings_dict):
 
 BASE_URL = "https://image.tmdb.org/t/p/w500"
 
-ALL_DOC_GENRES = [
-    "Biographie",
-    "Histoire","Nature et Environnement","Science et Technologie",
-    "Société et Culture","Voyage et Exploration",
-    "Affaires Criminelles","Sport","Musique et Art","Alimentation et Cuisine","Guerre et Conflit"]
-
+# Dico de genres traduits ------------------------
+#film
+genres_traduits = { 
+    "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
+    "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Documentaire",
+    "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
+    "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
+    "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
+    "Thriller": "Thriller", "War": "Guerre", "Western": "Western"
+    }
+#-------- docu
+genres_traduits_docu = { 
+        "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
+        "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Autres",
+        "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
+        "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
+        "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
+        "Thriller": "Thriller", "War": "Guerre"}
 #--------------------------------------Fonction sauvegarde note----------------------------
 
 def envoyer_note(movie_id, score, movie_title, username):
@@ -239,16 +251,20 @@ def page_new_user1():
         col1pref, col2pref = st.columns(2)
         with col1pref : 
             st.markdown("**Préférences du genre de films :**")
+            options_films = sorted(list(genres_traduits.keys()), key=lambda x: genres_traduits[x])
             new_genres = st.multiselect(
                         "",
-                        ["Action", "Comédie", "Drame", "Horreur", "Science-Fiction"]
+                        options=options_films,
+                        format_func=lambda x: genres_traduits[x]  #traduction
                         ,key="update_genres"
                     )
         with col2pref : 
             st.markdown("**Préférences du thème des documentaires :**")
+            options_docs = sorted(list(genres_traduits_docu.keys()), key=lambda x: genres_traduits_docu[x])
             new_doc_genres = st.multiselect(
                 "",
-                options=ALL_DOC_GENRES,
+                options=options_docs,
+                format_func=lambda x: genres_traduits_docu[x], #traduction
                 key="update_doc_genres")
         st.markdown("---")
         
@@ -561,7 +577,7 @@ def page_film():
     
     radio_col1, radio_col2, radio_col3= st.columns(3)
     with radio_col1: 
-        st.markdown("### Comment souhaitez-vous rechercher votre film ?")
+        st.markdown("### Comment souhaitez-vous rechercher votre prochain film ?")
         choix_filtres = st.radio("", (radio_choix))
     
     # Si on change de mode de recherche, on réinitialise la mémoire sinon affiche persiste
@@ -593,13 +609,13 @@ def page_film():
                 results = exact + sorted(starts, key=str.lower) + sorted(contains, key=str.lower)
                 
                 if results:
-                    film_write = st.selectbox("Résultats", options=results[:20])
+                    film_write = st.selectbox("Choisis parmi la liste : ", options=results[:20])
                 else:
                     error_films = st.error("Aucun film trouvé, merci de réessayer.")
 
             # Si la recherche n'est pas active, on affiche le message d'info
             if not st.session_state.search_active and query and error_films == False: 
-                st.info("Sélectionnez un titre et cliquez sur 'Lancer la recherche'.")
+                st.info("Sélectionnez un titre et cliquez sur 'Propose moi des suggestions'.")
         
         with radio_col2 :
             message_placeholder = st.empty()
@@ -613,19 +629,12 @@ def page_film():
                         st.session_state.search_active = True
 
 #----- Affichage recherche par filre
-    # Trad
-    genres_traduits = { 
-    "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
-    "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Documentaire",
-    "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
-    "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
-    "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
-    "Thriller": "Thriller", "War": "Guerre", "Western": "Western"
-    }
+    
     if choix_filtres == "Recherche par filtres" :
         #pror eviter refresh
         with st.form(key= 'form_filtres_films') :
-            filtre_col1, filtre_col2, filtre_col3 = st.columns(3)           
+            filtre_col1, filtre_col2, filtre_col3 = st.columns(3)   
+            #systeme de tra        
             with filtre_col1:
                 choix_fr = st.selectbox("Genre", ['Tous'] + sorted(genres_traduits.values()))
                 if choix_fr == "Tous":
@@ -668,8 +677,9 @@ def page_film():
         
         reco_df = df_streamlit.iloc[indices[0][1:5]]
         
-        st.markdown(f"### 🎯 Films recommandés pour : {film_write}")
-        st.markdown("---")
+        st.success(
+            f"🎯 **Films recommandés pour : {film_write}** \n\n"
+            "Résultats obtenus par **Nearest Neighbors** (IA) : comparaison de la sémantique des résumés (NLP), des genres, réalisateurs et acteurs.")
 
         # chargement user note comme surprends moi
         user_real_ratings = {}
@@ -1129,7 +1139,7 @@ def page_docu():
     ## affichage comment....    
     col1_search_t, col2_search_t, col3_search_t = st.columns(3)
     with col1_search_t: 
-        st.markdown("### Comment souhaitez-vous rechercher votre documentaire ?")
+        st.markdown("### Comment souhaitez-vous rechercher votre prochain documentaire ?")
         
         choix_filtres = st.radio("",
         radio_docu
@@ -1138,14 +1148,6 @@ def page_docu():
     if choix_filtres == "Recherche par filtres":
         df_documentaire = df_streamlit[df_streamlit['genres'].apply(lambda genres: 'Documentary' in genres)]
         st.info("Veuillez choisir le thème de votre documentaire")
-        
-        genres_traduits_docu = { 
-        "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
-        "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Autres",
-        "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
-        "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
-        "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
-        "Thriller": "Thriller", "War": "Guerre"}
 
         with st.form(key='form_filtres_docu'):
                 col_filt1, col_filt2 = st.columns(2)
@@ -1190,7 +1192,7 @@ def page_docu():
             # On compte le nombre total de résultats
             nb = len(resultats_docu)
             
-            # Message de debug pour savoir combien de films sont trouvés
+            # combien de film trouvé
             st.success(f"{nb} documentaires trouvés (Affichage des 20 premiers)")
 
             # IMPORTANT : On coupe le tableau pour ne garder que les 20 premiers
@@ -1247,7 +1249,6 @@ def page_docu():
                             st.write(f"📖 **Résumé :** {resume}")
                     
                     st.markdown("----")
-
                 
     if choix_filtres == "Surprends moi !":
         with col2_search_t:
@@ -1268,7 +1269,7 @@ def page_profil() :
         "Email": st.session_state['email'],
     }
 
-    col_left, col_center, col_right = st.columns(3)
+    col_left, col_center, col_right = st.columns([5,3,5])
     # Affichage du titre
     with col_center:
         
@@ -1303,23 +1304,29 @@ def page_profil() :
         col1, col2= st.columns(2)
         with col1:
         # Affichage des listes (Genre, Films, Documentaires)
+            options_films = sorted(list(genres_traduits.keys()), key=lambda x: genres_traduits[x])
             st.markdown("**Préférences du genre de films :**")
             new_genres = st.multiselect(
                         "",
-                        ["Action", "Comédie", "Drame", "Horreur", "Science-Fiction"]
-                        ,key="update_genres",
-                        default=user_genres
+                        options=options_films,           
+                        format_func=lambda x: genres_traduits[x], #
+                        key="update_genres",
+                        default = user_genres
                     )
         
         with col2:
             st.markdown("**Préférences du thème des documentaires :**")
+            options_docs = sorted(list(genres_traduits_docu.keys()), key=lambda x: genres_traduits_docu[x])
             new_doc_genres = st.multiselect(
                 "",
-                options=ALL_DOC_GENRES,
+                options=options_docs,
+                format_func=lambda x: genres_traduits_docu[x],
                 key="update_doc_genres",
                 default= user_docs
                 )
-        save_submitted = st.form_submit_button("Sauvegarder les modifications du profil")
+        col_biu1, col_biu2, col_biu3 = st.columns([3.7,3,3])
+        with col_biu2 :
+            save_submitted = st.form_submit_button("Sauvegarder les modifications du profil")
     st.markdown("---")
     
 # si on clique sur sauvegardes des modifs, ca envoie tout a l'api

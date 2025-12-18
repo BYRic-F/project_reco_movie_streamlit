@@ -55,7 +55,7 @@ preprocessor = ColumnTransformer(
         
         ('directors', Pipeline([
             ("tfifd", TfidfVectorizer(min_df=2)),
-            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 1.8}))
+            ("weight", FunctionTransformer(weight_features, kw_args={"weight": 1.4}))
             ]),'directors_clean'),
             
         
