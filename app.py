@@ -539,7 +539,7 @@ def page_accueil() :
         graph_col1, graph_col2 = st.columns(2, gap="medium")
 
         with graph_col1:
-            st.subheader("Par Genre")
+            st.subheader("Par genre")
             # Préparation des données Genres
             df_exploded = df_streamlit.explode('genres')
             genre_counts = df_exploded['genres'].value_counts().reset_index()
@@ -548,7 +548,7 @@ def page_accueil() :
             # Chart Altair
             chart_genres = alt.Chart(genre_counts).mark_bar(color='#E10600').encode(
                 x=alt.X('Genre', sort='-y', title=None),
-                y=alt.Y('Count', title='Nb de films'),
+                y=alt.Y('Count', title='Nombre de films'),
                 tooltip=['Genre', 'Count']
             ).properties(
                 height=300 # Hauteur fixe
@@ -559,7 +559,7 @@ def page_accueil() :
             with graph_col2:
                 st.subheader("Répartition des notes")
                 chart_ratings = alt.Chart(df_knn).mark_bar(color='#E10600').encode(
-                    x=alt.X('averageRating', bin=alt.Bin(maxbins=30), title='Note moyenne (Intervalle)'),
+                    x=alt.X('averageRating', bin=alt.Bin(maxbins=30), title='Note moyenne'),
                     y=alt.Y('count()', title='Nombre de films'),
                     # Tooltip adapté pour afficher l'intervalle et le compte
                     tooltip=[alt.Tooltip('averageRating', bin=True, title='Note approx.'), 'count()']
