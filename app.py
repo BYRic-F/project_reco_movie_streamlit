@@ -652,14 +652,15 @@ def page_film():
             with filtre_col2 :
                 annee = st.selectbox("Année de sortie", ["Tous"] + sorted(df_streamlit['startYear'].dropna().unique().tolist(), reverse=True))
                 producteur = st.selectbox("Producteurs", ["Tous"] + sorted(df_streamlit['producer'].explode().dropna().unique().tolist()))
+            with filtre_col3 :
+                pays = st.selectbox("Pays de production",['Tous'] + sorted(df_streamlit['original_language'].dropna().unique().tolist()))
+                duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
+            filtreselec1, filtreselec2 , filtreselec3 = st.columns(3)
+            with filtreselec2 : 
                 st.info("Sélectionnez vos filtres ! ")
                 button1, button2, button3 = st.columns([2,3,1])
                 with button2 :
                     submit_filtre = st.form_submit_button("Lancer la recherche", type="primary")
-            with filtre_col3 :
-                pays = st.selectbox("Pays de production",['Tous'] + sorted(df_streamlit['original_language'].dropna().unique().tolist()))
-                duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
-        
     
     
     
