@@ -582,7 +582,7 @@ def page_film():
         with radio_col2 :
             st.markdown("<div style='height:85px'></div>",unsafe_allow_html=True)
             #entrez le nom du film
-            query = st.text_input(label ="Entrez le titre du film")           
+            query = st.text_input(label ="Votre film coup de cœur ?")           
             film_write = None
             if query:
                 q = query.lower()
@@ -603,10 +603,10 @@ def page_film():
         
         with radio_col2 :
             message_placeholder = st.empty()
-            button1, button2, button3 = st.columns([2,3,1])
+            button1, button2, button3 = st.columns([1.5,3,1])
             with button2 :
                 # bouton lance et active memoire pour search_active
-                if st.button("Lancer la recherche"):
+                if st.button("Propose moi des suggestions"):
                     if not query:            
                             message_placeholder.error("Veuillez saisir un titre de film.")
                     else :
@@ -1141,22 +1141,33 @@ def page_docu():
         
         genres_traduits_docu = { 
         "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
-        "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Documentaire",
+        "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Autres",
         "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
         "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
         "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
         "Thriller": "Thriller", "War": "Guerre"}
 
-        col_filt1, col_filt2 = st.columns(2)
-        
-        with col_filt1:
-            choix_genre_docu = st.selectbox("Genres", ["Tous"] + df_documentaire['genres'].explode().dropna().unique().tolist())
-            duration_docu = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
-        # Contenu 2e colonne : tri date ancien ou recent
-        with col_filt2:
-            annee_docu = st.selectbox("Année de sortie", ["Tous"] + sorted(df_documentaire['startYear'].dropna().unique().tolist(), reverse=True))
-                    
-            submit_doc_fil = st.button("Lancer la recherche")
+        with st.form(key='form_filtres_docu'):
+                col_filt1, col_filt2 = st.columns(2)
+
+                with col_filt1:
+                    # 2. Utilisation de format_func pour la traduction
+                    choix_fr = st.selectbox("Genre", ['Tous'] + sorted(genres_traduits_docu.values()))
+                    if choix_fr == "Tous":
+                        choix_genre_docu = "Tous"
+                    else :
+                        choix_genre_docu = [ang for ang, fr in genres_traduits_docu.items() if fr == choix_fr][0]
+                    duration_docu = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
+                
+                with col_filt2:
+                    annee_docu = st.selectbox("Année de sortie", ["Tous"] + sorted(df_documentaire['startYear'].dropna().unique().tolist(), reverse=True))
+                
+                col_filt1button, col_filt2button, col_filt3button = st.columns([2.3,1,2])   
+                
+                with col_filt2button:        
+                    # 3. Changement en bouton de soumission de formulaire
+                    submit_doc_fil = st.form_submit_button("Lancer la recherche")
+
 
     #### SI recherche par filtre ATTENtion il faudra rajouter les conditions filtres
     if submit_doc_fil: 
@@ -1175,16 +1186,67 @@ def page_docu():
         if resultats_docu.empty:
             st.warning("Aucun film ne correspond exactement à tous ces critères combinés. Essayez d'en enlever un !")
             # On nettoie la mémoire pour ne pas laisser de vieux résultats
-            if 'resultats_filtre_memoire' in st.session_state:
-                del st.session_state['resultats_filtre_memoire']
         else:
-            #
+            # On compte le nombre total de résultats
             nb = len(resultats_docu)
-            nb_a_afficher = min(nb, 20)
-            #Gestkl de sessions_state pour l'envoi de notes
-            st.session_state['resultats_filtre_memoire'] = resultats_docu.sample(n=nb_a_afficher)
-            st.session_state['nb_resultats_filtre'] = nb
-            st.write(resultats_docu)
+            
+            # Message de debug pour savoir combien de films sont trouvés
+            st.success(f"{nb} films trouvés (Affichage des 20 premiers)")
+
+            # IMPORTANT : On coupe le tableau pour ne garder que les 20 premiers
+            films_affi = resultats_docu.sample(20)
+            
+            # On boucle sur la version coupée (films_affi) et non pas sur tout le tableau
+            for i, (idx, row) in enumerate(films_affi.iterrows()):
+                try: 
+                    f_id = str(int(float(row['id'])))
+                except: 
+                    continue
+
+                # Appel API TMDB
+                details = obtenir_details_film(f_id)
+                
+                if details and "id" in details:
+                    # Récup Crédits
+                    try:
+                        credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
+                        credits_data = requests.get(credits_url).json()
+                        directors = [m["name"] for m in credits_data.get("crew", []) if m["job"] == "Director"]
+                        cast = [a["name"] for a in credits_data.get("cast", [])[:5]]
+                    except:
+                        directors, cast = [], []
+
+                    annee_film = details.get('release_date', '????')[:4]
+                    genres_film = ", ".join([g['name'] for g in details.get('genres', [])])
+                    
+                    # Mise en page Colonnes
+                    col1, col2 = st.columns([1, 3]) 
+                    
+                    with col1:
+                        poster = details.get("poster_path")
+                        if poster: 
+                            st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
+                    
+                    with col2:
+                        # Petite astuce de mise en page pour aligner
+                        col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
+                        with col2mov:
+                            st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                            st.subheader(f"{i+1}. {details.get('title')}")
+                            st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+                            st.write(f"📅 **Année :** {annee_film} | 🎭 **Genres :** {genres_film} | 🕒 **Durée :** {details.get('runtime')} minutes")
+                            st.write(f"🎬 **Réalisateur :** {', '.join(directors)}")
+                            st.write(f"👥 **Acteurs :** {', '.join(cast)}")
+                            st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
+                            resume = details.get('overview')
+                            if not resume or resume.strip() == "":
+                                details_en = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json()
+                                resume = details_en.get('overview', 'Aucun résumé.')
+                            st.write(f"📖 **Résumé :** {resume}")
+                    
+                    st.markdown("----")
+
                 
     if choix_filtres == "Surprends moi !":
         with col2_search_t:
