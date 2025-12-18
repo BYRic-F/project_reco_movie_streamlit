@@ -99,8 +99,7 @@ def filtrer_films(df, genre, annee, pays, acteur, producteur, duree):
 # le svd model ne marchait pas sur des utilisateurs qui n'etait pas dans la BDD d'entrainement, on utilise donc un vecteur qui aime ce film, aime aussi ce film
 def generer_reco_via_qi(model_svd, ratings_dict):
     """
-    Génère des recommandations basées sur les vecteurs latents (QI).
-    Récupère le Top 100 pour permettre le filtrage des films déjà vus ensuite.
+    Utilisation vecteur latent por predictions
     """
     # On récupere les matrices d'entrainement de notre svd (carte complete des films)
     matrice_items = model_svd.qi
@@ -114,16 +113,16 @@ def generer_reco_via_qi(model_svd, ratings_dict):
     # ratings_dict, films notés sur Sheets
     for movie_id, rating in ratings_dict.items():
         try:
-            # Conversion ID externe (TMDB) -> ID interne (Surprise)
+            # Conversion ID externe (TMDB) -> ID interne (Surprise) fonciton to_inner_iid
             # On force int() car les clés JSON arrivent souvent en string
             iid = model_svd.trainset.to_inner_iid(int(movie_id))
-            # Pondération : On donne plus d'importance aux films bien notés
+            # Pondération : On donne plus d'importance aux films bien notés comme ca on evite navets
             poids = float(rating) / 5.0
             # Ajout au vecteur utilisateur
             user_vector += matrice_items[iid] * poids
             count += 1
         except (ValueError, KeyError):
-            # Cas où le film noté n'est pas dans le dataset d'entraînement
+            # gestionn erreur
             continue
             
     # Normalisation car sinon plus on noterait plus le vecteur serait long = distance faussée
@@ -135,7 +134,7 @@ def generer_reco_via_qi(model_svd, ratings_dict):
     
     # On récupère les plus grands indices
     # argsort trie du plus petit au plus grand, [::-1] inverse pour avoir le décroissant
-    # 100 meilleurs, le random est plus pertinent
+    
     top_indices = np.argsort(scores)[::-1][:100]
     
     # 7. Convertir les IDs internes (Surprise) en IDs réels (TMDB) comme le modele retient des index, ca permet de retourner en arriere
@@ -190,7 +189,7 @@ def obtenir_cast(film_id):
 #--------------------------------- page config new user--------------------------------------------------------
 
 def page_new_user1():
-    """ Affiche la page de première configuration avec une sélection de films et pagination. """
+    """ Affiche la page de première configuration a la 1ere co"""
 
     # Intro
     col1_h, col2_h, col3_h = st.columns([2,5,1])
@@ -374,8 +373,7 @@ def verifier_films_a_noter():
 
     # Si des films sont trouvés
     if pending_ids:
-        # On affiche un BANDEAU D'ALERTE joli et stable
-        # st.warning crée un fond jaune/orange qui attire l'oeil
+        # On affiche un bandeau alerte user
         with st.container(border=True):
             col_msg, col_btn = st.columns([3, 1])
             
@@ -583,6 +581,7 @@ def page_film():
         all_titles = sorted(df_streamlit['title_final'].dropna().astype(str).str.strip().unique(),key=str.lower)
         with radio_col2 :
             st.markdown("<div style='height:85px'></div>",unsafe_allow_html=True)
+            #entrez le nom du film
             query = st.text_input(label ="Entrez le titre du film")           
             film_write = None
             if query:
@@ -742,7 +741,7 @@ def page_film():
                                 
                                 # Bouton Watchlist
                                 with col_btn_w:
-                                    if st.button("🍿 Je regarde !", key=f"reco_w_{f_id}_{i}", use_container_width=True):
+                                    if st.button("🍿 Je regarde !", key=f"reco_w_{f_id}_{i}", width="stretch"):
                                         payload = {"action": "add_watchlist", "username": st.session_state['username'], "movie_id": f_id_str}
                                         requests.post(SHEETS_API_URL, json=payload)
                                         st.toast("Ajouté !")
@@ -898,7 +897,7 @@ def page_film():
                                 
                                 # BOUTON WATCHLIST
                                 with col_btn_w:
-                                    if st.button("🍿 Je regarde !", key=f"reco_w_filt_{f_id}_{i}", use_container_width=True):
+                                    if st.button("🍿 Je regarde !", key=f"reco_w_filt_{f_id}_{i}", width="stretch"):
                                         try:
                                             payload = {"action": "add_watchlist", "username": st.session_state['username'], "movie_id": f_id}
                                             requests.post(SHEETS_API_URL, json=payload)
@@ -987,17 +986,17 @@ def page_film():
     # condition si un film est affiché
     if 'film_surprise_actuel' in st.session_state :
         
-        # On récupère l'ID stocké
+        # On récupère id film chiusui
         f_id = st.session_state['film_surprise_actuel']
         nb_notes = st.session_state.get('nb_notes_user', '?')
 
-        # On récupère les détails (API TMDB)
+        # On récup detail
         details = obtenir_details_film(f_id)
         
         if details and "id" in details:
             st.success(f"✨ Basé sur vos {nb_notes} films notés !")
 
-            # Récupération Crédits
+            # Récup tmdb
             credits_url = f"https://api.themoviedb.org/3/movie/{f_id}/credits?api_key={API_KEY}&language=fr-FR"
             try: credits_data = requests.get(credits_url).json()
             except: credits_data = {}
@@ -1009,7 +1008,7 @@ def page_film():
             directors = [m["name"] for m in credits_data.get("crew", []) if m["job"] == "Director"]
             cast = [a["name"] for a in credits_data.get("cast", [])[:5]]
 
-            # --- MISE EN PAGE ---
+            # --MISE EN PAGE -
             col1, col2 = st.columns([1, 3]) 
             with col1:
                 poster = details.get("poster_path")
@@ -1051,7 +1050,7 @@ def page_film():
                         
                         # COLONNE 1 : BOUTON WATCHLIST
                         with col_btn_watch:
-                            if st.button("🍿 Je regarde !", key=f"btn_watch_{f_id}", use_container_width=True):
+                            if st.button("🍿 Je regarde !", key=f"btn_watch_{f_id}", width="stretch"):
                                 with st.spinner("Ajout à votre historique..."):
                                     try:
                                         payload = {
@@ -1114,11 +1113,15 @@ def page_film():
 def page_docu():
     """ Affichage page docu"""
     submit_doc_fil = False
+    submit_surprends = False
     #Selection selon l'authentif
-    
+    # On filtre pour n'avoir que les documentaires
+    df_documentaire = df_streamlit[df_streamlit['genres'].apply(lambda genres: 'Documentary' in genres)]
+    st.write(df_documentaire)
     radio_docu = ['Recherche par filtres']
     col_head_doc, col2_head_doc, col3_head_doc = st.columns([3,6,1])
-    
+    if st.session_state["authentication_status"] is True:
+        radio_docu.append("Surprends moi !")
     ## affichage titre
     with col2_head_doc:
         st.header("📚 Recherche de documentaires 📚")
@@ -1165,6 +1168,16 @@ def page_docu():
                             width=400 )
                 
                 st.markdown("---")
+                
+    if choix_filtres == "Surprends moi !":
+        with col2_search_t:
+            st.markdown("<div style='height:110px'></div>",unsafe_allow_html=True)
+            st.info("Voici une recommandation personnalisée surprise pour vous !")
+            col_but1, colbut2, colbut3 = st.columns([3,6,1])
+            with colbut2 :
+                submit_surprise = st.button("Nouveau film surprise")
+    st.markdown("---")
+        
                 
 #----------------------------------------- Page profil -----------------------------------------------------------    
 
@@ -1277,7 +1290,7 @@ def page_profil() :
     col_svd_1, col_svd_2, col_svd_3 = st.columns(3)
     with col_svd_2:
         
-        if st.button("Recommencer la notation ⭐️", use_container_width=True):
+        if st.button("Recommencer la notation ⭐️", width="stretch"):
             #on repasse sur page new_user
             st.session_state["is_new_user"] = True
             st.rerun()
