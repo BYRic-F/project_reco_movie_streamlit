@@ -1344,7 +1344,7 @@ def page_docu():
                     if f_id_clean in user_seen_ids:
                         # Juste l'info visuelle
                         st.success("✅ **Déjà vu** (Vous avez déjà noté ce documentaire)")
-            st.markdown("---")   
+                st.markdown("---")   
 #----------------------------------------- Page profil -----------------------------------------------------------    
 
 def page_profil() : 
