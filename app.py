@@ -1130,8 +1130,9 @@ def page_film():
     
 def page_docu():
     """ Affichage page docu"""
+    #initialisation pour eviter erreurs
     submit_doc_fil = False
-    submit_surprends = False
+    submit_surprise = False
     #Selection selon l'authentif
     # On filtre pour n'avoir que les documentaires
     df_documentaire = df_streamlit[df_streamlit['genres'].apply(lambda genres: 'Documentary' in genres)]
@@ -1230,7 +1231,7 @@ def page_docu():
                     annee_film = details.get('release_date', '????')[:4]
                     genres_film = ", ".join([g['name'] for g in details.get('genres', [])])
                     
-                    # Mise en page Colonnes
+                    # colonnes
                     col1, col2 = st.columns([1, 3]) 
                     
                     with col1:
@@ -1239,7 +1240,7 @@ def page_docu():
                             st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
                     
                     with col2:
-                        # Petite astuce de mise en page pour aligner
+                        # affichage
                         col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
                         with col2mov:
                             st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
@@ -1257,17 +1258,93 @@ def page_docu():
                             st.write(f"📖 **Résumé :** {resume}")
                     
                     st.markdown("----")
+    # Surrends moi docu est basé uniquement sur les thèmes de l'utilisteur 
                 
     if choix_filtres == "Surprends moi !":
         with col2_search_t:
             st.markdown("<div style='height:110px'></div>",unsafe_allow_html=True)
             st.info("Voici une recommandation personnalisée surprise pour vous !")
-            col_but1, colbut2, colbut3 = st.columns([3,6,1])
+            col_but1, colbut2, colbut3 = st.columns([1.9,6,1])
             with colbut2 :
-                submit_surprise = st.button("Nouveau film surprise")
-    st.markdown("---")
-        
+                submit_surprise = st.button("Nouveau documentaire surprise")
                 
+    st.markdown("---")
+    if submit_surprise:
+            # recup pref user
+            user_prefs = user_data.get('doc_genres_pref', [])
+            
+            # filtrage avec genres user
+            if user_prefs:
+                # filtre sur les docs selong genres user
+                df_filtered = df_documentaire[df_documentaire['genres'].apply(
+                    lambda g_list: any(pref in g_list for pref in user_prefs))]
+                
+                if not df_filtered.empty:
+                    selection = df_filtered.sample(1)
+                    st.success(f"🎯 Sélectionné parmi vos thèmes préférés")
+            else:
+                # si 0 pref random
+                selection = df_documentaire.sample(1)
+                
+            # 3. Sauvegarde en session
+            st.session_state['docu_surprise_actuel'] = str(int(float(selection.iloc[0]['id'])))
+
+        # --- AFFICHAGE DU RESULTAT ---
+            if 'docu_surprise_actuel' in st.session_state:
+                f_id = st.session_state['docu_surprise_actuel']
+            
+            # Récup infos API TMDB
+            details = obtenir_details_film(f_id)
+            
+            # Récupération de l'historique utilisateur pour savoir si "Déjà vu"
+            # On le fait ici pour être sûr d'avoir l'info à jour
+            user_seen_ids = set()
+            if st.session_state.get("authentication_status"):
+                try:
+                    res_ratings = requests.get(f"{SHEETS_API_URL}?action=get_user_ratings&username={st.session_state['username']}")
+                    if res_ratings.status_code == 200:
+                        # On récupère juste les IDs des films notés
+                        raw_ratings = res_ratings.json()
+                        # Nettoyage des IDs (str/float/int)
+                        user_seen_ids = set(str(int(float(k))) for k in raw_ratings.keys())
+                except:
+                    pass
+
+            if details and "id" in details:
+                # Affichage
+                col1, col2 = st.columns([1, 3]) 
+                
+                with col1:
+                    poster = details.get("poster_path")
+                    if poster: st.image(f"https://image.tmdb.org/t/p/w500{poster}", width='stretch')
+                
+                with col2:
+                    col1mov, col2mov, col3mov = st.columns([0.2, 4, 0.2])
+                    with col2mov :
+                        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    st.subheader(f"✨ {details.get('title')}")
+                    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+                    annee = details.get('release_date', '????')[:4]
+                    genres = ", ".join([g['name'] for g in details.get('genres', [])])
+                    st.write(f"📅 **Année :** {annee} | 🎭 **Genres :** {genres} | 🕒 **Durée :** {details.get('runtime')} min")
+                    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    resume = details.get('overview')
+                    if not resume: 
+                        try: resume = requests.get(f"https://api.themoviedb.org/3/movie/{f_id}?api_key={API_KEY}&language=en-US").json().get('overview', 'Pas de résumé.')
+                        except: resume = "Pas de résumé."
+                    st.write(f"📖 **Résumé :** {resume}")
+                    
+                    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    
+                    # --- ZONE ACTIONS SIMPLIFIÉE ---
+                    
+                    # 1. Vérification si déjà vu
+                    f_id_clean = str(int(float(f_id)))
+                    
+                    if f_id_clean in user_seen_ids:
+                        # Juste l'info visuelle
+                        st.success("✅ **Déjà vu** (Vous avez déjà noté ce documentaire)")
+            st.markdown("---")   
 #----------------------------------------- Page profil -----------------------------------------------------------    
 
 def page_profil() : 
@@ -1577,6 +1654,8 @@ else:
             st.error("Les mots de passe ne correspondent pas.")
         elif not username or not email or not password_raw:
             st.error("Veuillez remplir tous les champs obligatoires.")
+        elif not any(char.isalpha() for char in username):
+            st.error("⛔ Le nom d'utilisateur doit contenir au moins une lettre (ex: 'Moi10' et non '10').")
         else:
             try:
                 # 🚨 ÉTAPE CRUCIALE : Hachage du mot de passe
