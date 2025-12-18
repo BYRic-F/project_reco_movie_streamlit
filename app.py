@@ -1117,7 +1117,6 @@ def page_docu():
     #Selection selon l'authentif
     # On filtre pour n'avoir que les documentaires
     df_documentaire = df_streamlit[df_streamlit['genres'].apply(lambda genres: 'Documentary' in genres)]
-    st.write(df_documentaire)
     radio_docu = ['Recherche par filtres']
     col_head_doc, col2_head_doc, col3_head_doc = st.columns([3,6,1])
     if st.session_state["authentication_status"] is True:
@@ -1137,37 +1136,55 @@ def page_docu():
         )
         # Contenu 1ere colonne : Le choix par mot-clé 
     if choix_filtres == "Recherche par filtres":
+        df_documentaire = df_streamlit[df_streamlit['genres'].apply(lambda genres: 'Documentary' in genres)]
         st.info("Veuillez choisir le thème de votre documentaire")
-        col_filt1, col_filt2= st.columns(2)
+        
+        genres_traduits_docu = { 
+        "Action": "Action", "Adult": "Adulte", "Adventure": "Aventure", "Animation": "Animation",
+        "Biography": "Biographie", "Comedy": "Comédie", "Crime": "Crime", "Documentary": "Documentaire",
+        "Drama": "Drame", "Family": "Famille", "Fantasy": "Fantastique", "History": "Histoire",
+        "Horror": "Horreur", "Music": "Musique", "Musical": "Comédie musicale", "Mystery": "Mystère",
+        "News": "Actualités", "Romance": "Romance", "Sci-Fi": "Science-fiction", "Sport": "Sport",
+        "Thriller": "Thriller", "War": "Guerre"}
+
+        col_filt1, col_filt2 = st.columns(2)
         
         with col_filt1:
-            recherche_genre = genre = st.selectbox("Thème", ALL_DOC_GENRES)
-            duration = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])
-    # Contenu 2e colonne : tri date ancien ou recent
+            choix_genre_docu = st.selectbox("Genres", ["Tous"] + df_documentaire['genres'].explode().dropna().unique().tolist())
+            duration_docu = st.select_slider("Durée", options=["Toutes", "Moins de 90 min", "90-120 min", "Plus de 120 min"])  
+        # Contenu 2e colonne : tri date ancien ou recent
         with col_filt2:
-            annee_docu_range = st.selectbox(
-            "Période de sortie", 
-            ["Toutes les années","Moins de 1 an (Très Récent)",
-    "Moins de 5 ans (Contemporain)","Moins de 10 ans",
-    "Après 2000","1990 - 2000 (Classique)"])
-                
-        submit_doc_fil = st.button("Lancer la recherche")
+            annee_docu = st.selectbox("Année de sortie", ["Tous"] + sorted(df_documentaire['startYear'].dropna().unique().tolist(), reverse=True))
+                    
+            submit_doc_fil = st.button("Lancer la recherche")
 
     #### SI recherche par filtre ATTENtion il faudra rajouter les conditions filtres
     if submit_doc_fil: 
-        LIST_TEST_DOCU = ["coucou", 'blou']
-        COLUMNS_PER_ROW = 2
-        cols = st.columns(COLUMNS_PER_ROW)
-
-        for i, movie in enumerate(LIST_TEST_DOCU):
-            with cols[i % 2]:
-                
-                #affichage films
-                st.markdown(f"**{movie}**")
-                st.image("https://m.media-amazon.com/images/I/71-B0aUFxYL._AC_SL1191_.jpg", 
-                            width=400 )
-                
-                st.markdown("---")
+        # On calcule les résultats
+        resultats_docu = filtrer_films(
+            df_documentaire, 
+            genre=choix_genre_docu, 
+            annee=annee_docu, 
+            pays=None, 
+            acteur=None, 
+            producteur=None, 
+            duree=duration_docu
+        )
+        
+        # Gestion des résultats vides
+        if resultats_docu.empty:
+            st.warning("Aucun film ne correspond exactement à tous ces critères combinés. Essayez d'en enlever un !")
+            # On nettoie la mémoire pour ne pas laisser de vieux résultats
+            if 'resultats_filtre_memoire' in st.session_state:
+                del st.session_state['resultats_filtre_memoire']
+        else:
+            #
+            nb = len(resultats_docu)
+            nb_a_afficher = min(nb, 20)
+            #Gestkl de sessions_state pour l'envoi de notes
+            st.session_state['resultats_filtre_memoire'] = resultats_docu.sample(n=nb_a_afficher)
+            st.session_state['nb_resultats_filtre'] = nb
+            st.write(resultats_docu)
                 
     if choix_filtres == "Surprends moi !":
         with col2_search_t:
