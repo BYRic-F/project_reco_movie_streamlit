@@ -11,6 +11,8 @@ import joblib
 import numpy as np
 import altair as alt
 import random
+import unicodedata
+import re
 
 # cle api et secrets
 # On récupère les clés depuis les secrets (fonctionne en Local ET sur le Cloud)
@@ -95,6 +97,22 @@ def filtrer_films(df, genre, annee, pays, acteur, producteur, duree):
             df_res = df_res[df_res['runtimeMinutes'] > 120]
     return df_res
 
+#---------------------------- def nettoyage input film -----------------------------------
+def retirer_accents(texte):
+    """
+    Poru tout nettoyer
+    """
+    if not isinstance(texte, str):
+        return str(texte)
+        #  On enleve les accents
+    texte_norm = unicodedata.normalize('NFKD', texte)
+    texte_sans_accent = "".join([c for c in texte_norm if not unicodedata.combining(c)])
+    # minuscule
+    texte_lower = texte_sans_accent.lower()   
+    # Regex quete
+    texte_clean = re.sub(r'[^a-z0-9]', ' ', texte_lower)   
+    #On nettoie les espaces multiples (ex: "arrete  moi" -> "arrete moi")
+    return " ".join(texte_clean.split())
 
 #-----------------------------  Creation fonction svd : récupérer note + pred ------------------------------
 
@@ -501,7 +519,7 @@ def page_accueil() :
         * Élargissez vos horizons avec notre sélection de documentaires triés sur le volet. Nous vous proposons des œuvres **de haute qualité** et des histoires puissantes pour satisfaire votre curiosité et approfondir votre compréhension du monde.
         """)
         #--------------------- NOtre BDD-------------------------------------------
-    with st.expander("📖 Statistiques de la base", expanded=True):
+    with st.expander("📖 Statistiques de la base"):
         st.write("### Coup d'œil sur le catalogue")
         
         # Métriques
@@ -601,17 +619,30 @@ def page_film():
 # AFFIcgha ge  Recherche par titre--------
     search_col1, search_col2, search_col3 = st.columns(3)   
     if choix_filtres == "Recherche par titre":
-        all_titles = sorted(df_streamlit['title_final'].dropna().astype(str).str.strip().unique(),key=str.lower)
+        # --- MISE EN CACHE DES DONNÉES DE RECHERCHE ---
+        if 'search_data_cache' not in st.session_state:
+            # On prend directement les colonnes depuis votre DataFrame
+            # Index 0 = Titre nettoyé (pour chercher)
+            # Index 1 = Titre affiché (pour le selectbox)
+            st.session_state['search_data_cache'] = df_streamlit[['title_search', 'title_final']].values.tolist()
+
+        search_data = st.session_state['search_data_cache']
+        
         with radio_col2 :
             st.markdown("<div style='height:85px'></div>",unsafe_allow_html=True)
-            #entrez le nom du film
             query = st.text_input(label ="Votre film coup de cœur ?")           
             film_write = None
+            
             if query:
-                q = query.lower()
-                exact = [t for t in all_titles if t.lower() == q]
-                starts = [t for t in all_titles if t.lower().startswith(q) and t not in exact]
-                contains = [t for t in all_titles if q in t.lower() and t not in exact + starts]
+                # 1. Nettoyage de la saisie
+                q_clean = retirer_accents(query)
+                
+                # 2. Algorithme de recherche (List comprehension rapide)
+                exact = [original for clean, original in search_data if clean == q_clean]
+                
+                starts = [original for clean, original in search_data if clean.startswith(q_clean) and original not in exact]
+                
+                contains = [original for clean, original in search_data if q_clean in clean and original not in exact + starts]
 
                 results = exact + sorted(starts, key=str.lower) + sorted(contains, key=str.lower)
                 
