@@ -5,11 +5,13 @@ PicquePoule est une application web interactive de recommandation cinématograph
 Le projet se distingue par son catalogue rigoureusement filtré (10 000 titres premium) et son double moteur de recommandation : sémantique (NLP) et collaboratif (SVD).
 
 
-## Défis Techniques & Solutions
+## Défis techniques & solutions
 
 - Bases de données lourdes : Passage par DuckDB et SQL pour éviter les crashs RAM rencontrés sur Colab.
 
 - Persistance des données : Utilisation intensive du format Pickle et Parquet pour conserver les types complexes.
+
+- Problème de "Cold Start" (Démarrage à froid) : Le modèle SVD ne pouvait pas générer de recommandations pour les nouveaux profils vides. Cela nous a conduits à concevoir une page qui oblige l'utilisateur à noter au moins 5 films lors de sa première connexion pour "nourrir" l'algorithme.
 
 - Authentification : Développement d'un flux manuel car l'outil standard ne permettait pas l'envoi direct des mots de passe vers Sheets.
 
@@ -19,7 +21,21 @@ Le projet se distingue par son catalogue rigoureusement filtré (10 000 titres p
 
 - Recherche textuelle : Nettoyage des accents et caractères spéciaux pour assurer la correspondance entre la saisie utilisateur et la BDD.
 
-## Installation et Configuration
+- Modèle Hybride : Créer un "Ensemble Model" qui mélange le contenu (KNN/NLP) et le collaboratif (SVD). Cela permettrait de recommander des films à la fois proches de ce qu'on aime et populaires chez les profils similaires.
+
+# Axes d'amélioration
+
+- Améliorer le temps d'exécution de l'application
+
+- Migration de Google Sheets vers une vraie BDD : Google Sheets est génial pour débuter, mais il devient lent quand le nombre d'utilisateurs augmente. Passer sur du SQL permettrait des requêtes beaucoup plus rapides pour l'authentification et l'historique.
+
+- Gestion d'une liste de films marqués comme "A voir" : Créer une page dédiée "Ma Liste" où l'utilisateur peut retrouver tous les films marqués comme "À voir", avec la possibilité de les supprimer ou de les noter une fois vus.
+
+- Intégration de Bandes-Annonces : Utiliser l'API TMDB pour récupérer la clé YouTube du trailer et l'afficher directement dans Streamlit avec st.video().
+
+- Système d'authentification qui permet de récupérer ses mots de passe, et qui gère les adresses mail non valides.
+
+## Installation et configuration
 Ce projet utilise uv pour la gestion des dépendances et de l'environnement virtuel.
 
 ### Prérequis
@@ -46,10 +62,10 @@ Le projet nécessite le modèle de langue anglaise de la librairie SpaCy :
 ```
 uv run python -m spacy download en_core_web_sm
 ```
-## Architecture du Pipeline de Données
+## Architecture du pipeline de données
 Les scripts de transformation se trouvent dans le dossier src/. L'exécution doit suivre l'ordre chronologique ci-dessous pour garantir l'intégrité des données.
 
-### 1. Découverte et Extraction Initiale
+### 1. Découverte et extraction initiale
 - Exploration : src/explore/decouverte_bdd_duckBDD.py
 
   - Exploration initiale des fichiers sources via DuckDB.
