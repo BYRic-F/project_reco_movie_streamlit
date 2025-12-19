@@ -488,8 +488,8 @@ def page_accueil() :
         Nous exigeons des scores de public élevés pour éliminer les contenus de faible qualité :
         
         * **Large choix :** Environ 10 000 films.
-        * **Note Moyenne :** Supérieure à **6.5/10**.
-        * **Nombre de Votes :** Plus de **500 votes** enregistrés.
+        * **Note moyenne :** Supérieure à **6.5/10**.
+        * **Nombre de votes :** Plus de **500 votes** enregistrés.
         """)
 
 #---- Année---
@@ -497,9 +497,9 @@ def page_accueil() :
         st.markdown("""
         Nous assurons une sélection de contenu adapté à une séance cinéma :
         
-        * **Sortie Récente :** Films produits après **1990**.
-        * **Durée Minimale :** Plus de **75 minutes**.
-        * **Type de Contenu :** Uniquement des **longs-métrages**.
+        * **Sortie récente :** Films produits après **1990**.
+        * **Durée minimale :** Plus de **75 minutes**.
+        * **Type de contenu :** Uniquement des **longs-métrages**.
         """)
 
     #-----Origine film-----
@@ -507,8 +507,8 @@ def page_accueil() :
         st.markdown("""
         Nous avons accès aux données d'un catalogue mondial :
         
-        * **Cinéma de Référence :** Films produits principalement aux **États-Unis**, au **Royaume-Uni**, en **France**, en **Allemagne**, en **Espagne** et en **Italie**.
-        * **Autres Origines Diversifiées :** Nous incluons également des œuvres significatives produites au **Japon**, aux **Pays-Bas**, au **Portugal**, en **Irlande** et en **Finlande**.
+        * **Cinéma de référence :** Films produits principalement aux **États-Unis**, au **Royaume-Uni**, en **France**, en **Allemagne**, en **Espagne** et en **Italie**.
+        * **Autres origines diversifiées :** Nous incluons également des œuvres significatives produites au **Japon**, aux **Pays-Bas**, au **Portugal**, en **Irlande** et en **Finlande**.
         """)
         
     #---Docu--------------------------------------
@@ -519,7 +519,7 @@ def page_accueil() :
         * Élargissez vos horizons avec notre sélection de documentaires triés sur le volet. Nous vous proposons des œuvres **de haute qualité** et des histoires puissantes pour satisfaire votre curiosité et approfondir votre compréhension du monde.
         """)
         #--------------------- NOtre BDD-------------------------------------------
-    with st.expander("📖 Statistiques de la base"):
+    with st.expander("📖 Statistiques de la base de données"):
         st.write("### Coup d'œil sur le catalogue")
         
         # Métriques
@@ -647,7 +647,7 @@ def page_film():
                 results = exact + sorted(starts, key=str.lower) + sorted(contains, key=str.lower)
                 
                 if results:
-                    film_write = st.selectbox("Choisis parmi la liste : ", options=results[:20])
+                    film_write = st.selectbox("Choisissez parmi la liste : ", options=results[:20])
                 else:
                     error_films = st.error("Aucun film trouvé, merci de réessayer.")
 
