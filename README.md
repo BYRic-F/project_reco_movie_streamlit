@@ -23,7 +23,7 @@ Le projet se distingue par son catalogue rigoureusement filtré (10 000 titres p
 
 - Modèle Hybride : Créer un "Ensemble Model" qui mélange le contenu (KNN/NLP) et le collaboratif (SVD). Cela permettrait de recommander des films à la fois proches de ce qu'on aime et populaires chez les profils similaires.
 
-# Axes d'amélioration
+## Axes d'amélioration
 
 - Améliorer le temps d'exécution de l'application
 
