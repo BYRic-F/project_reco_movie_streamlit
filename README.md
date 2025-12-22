@@ -1,5 +1,6 @@
-# Système de Recommandation de Films
+# Système de recommandation de films
 
+**Lien pour tester l'application :**
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://byric-f-project-reco-movie-streamlit-app-3pm0kb.streamlit.app/)
 
 PicquePoule est une application web interactive de recommandation cinématographique exploitant une chaîne de traitement de données (ETL) hybride (SQL/Pandas) et des algorithmes de Machine Learning avancés.
